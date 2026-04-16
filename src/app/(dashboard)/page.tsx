@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   Activity,
   CreditCard,
@@ -5,6 +6,7 @@ import {
   CheckCircle,
   TrendingUp,
   Clock,
+  ArrowRight,
 } from "lucide-react";
 import {
   Card,
@@ -161,9 +163,10 @@ export default async function DashboardOverview() {
           <CardContent className="space-y-3">
             {recentCalls.length > 0 ? (
               recentCalls.map((call) => (
-                <div
+                <Link
                   key={call.id}
-                  className="flex items-center justify-between py-1"
+                  href={`/dashboard/calls/${call.id}`}
+                  className="flex items-center justify-between py-1 rounded px-1 hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 shrink-0">
@@ -195,7 +198,7 @@ export default async function DashboardOverview() {
                   >
                     {getCallStatusLabel(call.status)}
                   </Badge>
-                </div>
+                </Link>
               ))
             ) : (
               <div className="flex flex-col items-center justify-center py-6 text-center">

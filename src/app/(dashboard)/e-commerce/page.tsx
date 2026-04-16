@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getUserSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { orders, calls } from "@/lib/db/schema";
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   ShoppingCart,
   CheckCircle,
@@ -19,8 +21,12 @@ import {
   Phone,
   Clock,
   AlertTriangle,
+  ExternalLink,
+  PhoneCall,
+  RefreshCw,
 } from "lucide-react";
 import { formatFcfa, getOrderStatusLabel } from "@/lib/utils";
+import { ManualCallButton } from "@/components/shared/manual-call-button";
 
 const statusConfig = {
   pending: {
@@ -61,13 +67,28 @@ export default async function EcommercePage() {
     .orderBy(desc(orders.createdAt))
     .limit(50);
 
+  // Récupérer les derniers appels pour chaque commande
+  const orderIds = allOrders.map((o) => o.id);
+
   const stats = {
     total: allOrders.length,
     pending: allOrders.filter((o) => o.status === "pending").length,
     confirmed: allOrders.filter((o) => o.status === "confirmed").length,
     cancelled: allOrders.filter((o) => o.status === "cancelled").length,
     noAnswer: allOrders.filter((o) => o.status === "no_answer").length,
+    calling: allOrders.filter((o) => o.status === "calling").length,
   };
+
+  const confirmationRate =
+    stats.total > 0
+      ? Math.round(
+          (stats.confirmed / (stats.total - stats.pending - stats.calling)) *
+            100
+        ) || 0
+      : 0;
+
+  const baseUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://votre-domaine.com";
 
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
@@ -77,15 +98,21 @@ export default async function EcommercePage() {
         </h2>
         <p className="text-muted-foreground">
           Confirmation automatique des commandes paiement à la livraison (COD)
+          via Shopify et WooCommerce
         </p>
       </div>
 
       {/* Statistiques */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {[
           {
-            label: "Total commandes",
+            label: "Total",
             value: stats.total,
+            color: "text-foreground",
+          },
+          {
+            label: "En cours",
+            value: stats.calling,
             color: "text-blue-500",
           },
           {
@@ -99,48 +126,61 @@ export default async function EcommercePage() {
             color: "text-red-500",
           },
           {
-            label: "Sans réponse",
-            value: stats.noAnswer,
-            color: "text-yellow-500",
+            label: "Taux de confirmation",
+            value: `${confirmationRate}%`,
+            color: confirmationRate >= 70 ? "text-green-500" : "text-yellow-500",
           },
         ].map((s) => (
           <Card key={s.label}>
             <CardContent className="flex items-center justify-between p-4">
               <p className="text-sm text-muted-foreground">{s.label}</p>
-              <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+              <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Configuration Webhook */}
-      <Card className="border-primary/20 bg-primary/5">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">
-            Configuration Shopify Webhook
-          </CardTitle>
-          <CardDescription>
-            Connectez votre boutique Shopify pour recevoir les commandes
-            automatiquement
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md bg-muted p-3 font-mono text-sm break-all">
-            {`${process.env.NEXT_PUBLIC_SITE_URL ?? "https://votre-domaine.com"}/api/webhooks/shopify`}
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Copiez cette URL dans Shopify → Paramètres → Notifications →
-            Webhooks → Créer un webhook (événement : Création de commande)
-          </p>
-        </CardContent>
-      </Card>
+      {/* Configuration Webhooks */}
+      <div className="grid gap-3 md:grid-cols-2">
+        {[
+          {
+            label: "Shopify Webhook",
+            path: "/api/webhooks/shopify",
+            instructions: "Shopify → Paramètres → Notifications → Webhooks",
+          },
+          {
+            label: "WooCommerce Webhook",
+            path: "/api/webhooks/woocommerce",
+            instructions:
+              "WooCommerce → Paramètres → Avancé → Webhooks (Order created)",
+          },
+        ].map((wh) => (
+          <Card key={wh.path} className="border-primary/20 bg-primary/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <ShoppingCart className="h-4 w-4 text-primary" />
+                {wh.label}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <code className="block rounded-md bg-muted p-2 text-xs font-mono break-all">
+                {baseUrl}{wh.path}
+              </code>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {wh.instructions}
+              </p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       {/* Liste des commandes */}
       <Card>
         <CardHeader>
           <CardTitle>Commandes ({allOrders.length})</CardTitle>
           <CardDescription>
-            Suivi en temps réel des confirmations par IA
+            Suivi en temps réel des confirmations par IA — cliquez sur une
+            commande pour voir les détails
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -149,8 +189,8 @@ export default async function EcommercePage() {
               <ShoppingCart className="h-10 w-10 text-muted-foreground/50 mb-3" />
               <p className="font-medium">Aucune commande reçue</p>
               <p className="text-sm text-muted-foreground">
-                Configurez votre webhook Shopify pour commencer à recevoir des
-                commandes
+                Configurez vos webhooks Shopify ou WooCommerce pour recevoir
+                des commandes automatiquement
               </p>
             </div>
           ) : (
@@ -160,6 +200,9 @@ export default async function EcommercePage() {
                   statusConfig[order.status as keyof typeof statusConfig] ??
                   statusConfig.pending;
                 const StatusIcon = config.icon;
+                const canRetryCall =
+                  order.status === "no_answer" ||
+                  order.status === "pending";
 
                 return (
                   <div
@@ -185,6 +228,11 @@ export default async function EcommercePage() {
                               minute: "2-digit",
                             }
                           )}
+                          {order.source && (
+                            <span className="ml-1 capitalize opacity-60">
+                              · {order.source}
+                            </span>
+                          )}
                         </p>
                         {order.customerAddress && (
                           <p className="text-xs text-muted-foreground truncate max-w-[200px]">
@@ -203,6 +251,9 @@ export default async function EcommercePage() {
                         <StatusIcon className="h-3 w-3" />
                         {config.label}
                       </Badge>
+                      {canRetryCall && (
+                        <ManualCallButton orderId={order.id} />
+                      )}
                     </div>
                   </div>
                 );
