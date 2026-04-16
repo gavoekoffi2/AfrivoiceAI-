@@ -1,8 +1,9 @@
 import { redirect, notFound } from "next/navigation";
+import Link from "next/link";
 import { getUserSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { campaigns, leads, calls } from "@/lib/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import {
   Card,
   CardContent,
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import {
   PhoneCall,
   Users,
@@ -20,8 +22,8 @@ import {
   Upload,
   Play,
   Pause,
+  Target,
 } from "lucide-react";
-import Link from "next/link";
 import { formatFcfa, formatDuration, getCallStatusLabel } from "@/lib/utils";
 import { LeadsImporter } from "@/components/shared/leads-importer";
 import { CampaignBatchCaller } from "@/components/shared/campaign-batch-caller";
@@ -50,38 +52,82 @@ export default async function CampaignDetailPage({
 
   const campaign = campaignResult[0];
 
-  // Récupérer les leads et leurs appels
+  // Récupérer les leads de cette campagne
   const campaignLeads = await db
     .select()
     .from(leads)
-    .where(eq(leads.campaignId, params.id))
+    .where(
+      and(
+        eq(leads.campaignId, params.id),
+        eq(leads.organizationId, session.organizationId)
+      )
+    )
     .orderBy(desc(leads.createdAt))
     .limit(50);
 
-  // Récupérer les appels de cette campagne
-  const campaignCalls = await db
-    .select()
-    .from(calls)
-    .where(
-      and(
-        eq(calls.organizationId, session.organizationId),
-      )
-    )
-    .orderBy(desc(calls.createdAt))
-    .limit(20);
+  // Récupérer les appels liés aux leads de cette campagne
+  const leadIds = campaignLeads.map((l) => l.id);
+
+  const campaignCalls =
+    leadIds.length > 0
+      ? await db
+          .select()
+          .from(calls)
+          .where(
+            and(
+              eq(calls.organizationId, session.organizationId),
+              eq(calls.type, "prospecting"),
+              inArray(calls.leadId, leadIds)
+            )
+          )
+          .orderBy(desc(calls.createdAt))
+          .limit(30)
+      : [];
 
   const newLeads = campaignLeads.filter((l) => l.status === "new").length;
   const calledLeads = campaignLeads.filter((l) => l.status !== "new").length;
   const qualifiedLeads = campaignLeads.filter(
     (l) => l.status === "qualified"
   ).length;
+  const notInterestedLeads = campaignLeads.filter(
+    (l) => l.status === "not_interested"
+  ).length;
 
-  const statusColors: Record<string, string> = {
+  const progressPercent =
+    campaignLeads.length > 0
+      ? Math.round((calledLeads / campaignLeads.length) * 100)
+      : 0;
+
+  const successRate =
+    calledLeads > 0 ? Math.round((qualifiedLeads / calledLeads) * 100) : 0;
+
+  // Coût total de la campagne
+  const totalCostFcfa = campaignCalls.reduce(
+    (sum, c) => sum + (c.costFcfa ? parseFloat(c.costFcfa) : 0),
+    0
+  );
+
+  const statusColors: Record<
+    string,
+    "secondary" | "info" | "success" | "destructive" | "warning"
+  > = {
     new: "secondary",
     called: "info",
     qualified: "success",
     not_interested: "destructive",
     no_answer: "warning",
+  };
+
+  const callStatusColors: Record<
+    string,
+    "success" | "destructive" | "warning" | "secondary" | "info"
+  > = {
+    completed: "success",
+    failed: "destructive",
+    "no-answer": "warning",
+    queued: "secondary",
+    "in-progress": "info",
+    ringing: "info",
   };
 
   return (
@@ -95,37 +141,57 @@ export default async function CampaignDetailPage({
           </Link>
         </Button>
         <span className="text-muted-foreground">/</span>
-        <span className="font-medium">{campaign.name}</span>
+        <span className="font-medium truncate max-w-xs">{campaign.name}</span>
       </div>
 
       {/* En-tête campagne */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">{campaign.name}</h2>
-          <p className="text-muted-foreground">{campaign.objective}</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h2 className="text-2xl font-bold tracking-tight">
+              {campaign.name}
+            </h2>
+            <Badge
+              variant={campaign.status === "active" ? "success" : "secondary"}
+            >
+              {campaign.status === "active"
+                ? "Active"
+                : campaign.status === "paused"
+                ? "En pause"
+                : campaign.status === "completed"
+                ? "Terminée"
+                : "Brouillon"}
+            </Badge>
+          </div>
+          <p className="text-muted-foreground mt-1">{campaign.objective}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge
-            variant={campaign.status === "active" ? "success" : "secondary"}
-          >
-            {campaign.status === "active"
-              ? "Active"
-              : campaign.status === "paused"
-              ? "En pause"
-              : campaign.status === "completed"
-              ? "Terminée"
-              : "Brouillon"}
-          </Badge>
-          <CampaignBatchCaller
-            campaignId={campaign.id}
-            status={campaign.status}
-            pendingLeads={newLeads}
-          />
-        </div>
+        <CampaignBatchCaller
+          campaignId={campaign.id}
+          status={campaign.status}
+          pendingLeads={newLeads}
+        />
       </div>
 
+      {/* Progression */}
+      {campaignLeads.length > 0 && (
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">Progression</span>
+              <span className="text-sm text-muted-foreground">
+                {calledLeads} / {campaignLeads.length} leads contactés
+              </span>
+            </div>
+            <Progress value={progressPercent} className="h-2" />
+            <p className="text-xs text-muted-foreground mt-1">
+              {progressPercent}% de la campagne effectuée
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Statistiques */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {[
           {
             label: "Total leads",
@@ -151,14 +217,24 @@ export default async function CampaignDetailPage({
             icon: CheckCircle,
             color: "text-green-500",
           },
+          {
+            label: "Taux de succès",
+            value: `${successRate}%`,
+            icon: Target,
+            color: successRate >= 30 ? "text-green-500" : "text-yellow-500",
+          },
         ].map((stat) => (
           <Card key={stat.label}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">{stat.label}</CardTitle>
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                {stat.label}
+              </CardTitle>
               <stat.icon className={`h-4 w-4 ${stat.color}`} />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
+              <div className={`text-2xl font-bold ${stat.color}`}>
+                {stat.value}
+              </div>
             </CardContent>
           </Card>
         ))}
@@ -173,7 +249,7 @@ export default async function CampaignDetailPage({
               Importer des leads
             </CardTitle>
             <CardDescription>
-              Importez un fichier CSV avec les colonnes : nom, téléphone, entreprise
+              CSV avec colonnes : nom, téléphone, entreprise (optionnel)
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -184,14 +260,27 @@ export default async function CampaignDetailPage({
         {/* Liste des leads */}
         <Card>
           <CardHeader>
-            <CardTitle>Leads ({campaignLeads.length})</CardTitle>
+            <CardTitle className="flex items-center justify-between">
+              <span>Leads ({campaignLeads.length})</span>
+              {totalCostFcfa > 0 && (
+                <span className="text-sm font-normal text-muted-foreground">
+                  Coût total : {formatFcfa(totalCostFcfa)}
+                </span>
+              )}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {campaignLeads.length === 0 ? (
-                <p className="text-center text-sm text-muted-foreground py-6">
-                  Aucun lead importé
-                </p>
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <Users className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    Aucun lead importé
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Importez un CSV pour commencer
+                  </p>
+                </div>
               ) : (
                 campaignLeads.map((lead) => (
                   <div
@@ -206,17 +295,15 @@ export default async function CampaignDetailPage({
                         {lead.phone}
                         {lead.company && ` · ${lead.company}`}
                       </p>
+                      {lead.notes && (
+                        <p className="text-xs text-muted-foreground truncate max-w-[180px] italic">
+                          {lead.notes}
+                        </p>
+                      )}
                     </div>
                     <Badge
-                      variant={
-                        (statusColors[lead.status] as
-                          | "secondary"
-                          | "info"
-                          | "success"
-                          | "destructive"
-                          | "warning") ?? "secondary"
-                      }
-                      className="shrink-0 text-xs"
+                      variant={statusColors[lead.status] ?? "secondary"}
+                      className="shrink-0 text-xs ml-2"
                     >
                       {lead.status === "new"
                         ? "Nouveau"
@@ -237,17 +324,34 @@ export default async function CampaignDetailPage({
       </div>
 
       {/* Historique des appels */}
-      {campaignCalls.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Historique des appels</CardTitle>
-          </CardHeader>
-          <CardContent>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <PhoneCall className="h-5 w-5 text-primary" />
+            Historique des appels ({campaignCalls.length})
+          </CardTitle>
+          <CardDescription>
+            Cliquez sur un appel pour voir la transcription
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {campaignCalls.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <PhoneCall className="h-8 w-8 text-muted-foreground/50 mb-2" />
+              <p className="text-sm text-muted-foreground">
+                Aucun appel pour l&apos;instant
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Activez la campagne et lancez des appels
+              </p>
+            </div>
+          ) : (
             <div className="space-y-2">
               {campaignCalls.map((call) => (
-                <div
+                <Link
                   key={call.id}
-                  className="flex items-center justify-between rounded-md border p-3"
+                  href={`/dashboard/calls/${call.id}`}
+                  className="flex items-center justify-between rounded-md border p-3 hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <PhoneCall className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -260,26 +364,49 @@ export default async function CampaignDetailPage({
                           ? formatDuration(call.durationSeconds)
                           : "—"}{" "}
                         ·{" "}
-                        {new Date(call.createdAt).toLocaleDateString("fr-TG")}
+                        {new Date(call.createdAt).toLocaleDateString("fr-TG", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {call.costFcfa && (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground hidden sm:block">
                         {formatFcfa(parseFloat(call.costFcfa))}
                       </span>
                     )}
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge
+                      variant={callStatusColors[call.status] ?? "secondary"}
+                      className="text-xs"
+                    >
                       {getCallStatusLabel(call.status)}
                     </Badge>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Script de l'IA */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Script de l&apos;IA</CardTitle>
+          <CardDescription>
+            Prompt utilisé par l&apos;assistant vocal pour cette campagne
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <pre className="rounded-md bg-muted/50 p-4 text-xs leading-relaxed whitespace-pre-wrap font-sans overflow-auto max-h-48">
+            {campaign.scriptTemplate}
+          </pre>
+        </CardContent>
+      </Card>
     </div>
   );
 }

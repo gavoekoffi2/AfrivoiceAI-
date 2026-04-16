@@ -37,6 +37,11 @@ const mainNavItems = [
     icon: Megaphone,
   },
   {
+    title: "Appels",
+    href: "/dashboard/calls",
+    icon: PhoneCall,
+  },
+  {
     title: "Wallet",
     href: "/dashboard/wallet",
     icon: Wallet,
