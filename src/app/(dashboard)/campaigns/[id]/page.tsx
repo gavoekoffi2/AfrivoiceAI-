@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getUserSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { campaigns, leads, calls } from "@/lib/db/schema";
+import { campaigns, leads, calls, organizations } from "@/lib/db/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import {
   Card,
@@ -51,6 +51,13 @@ export default async function CampaignDetailPage({
   if (!campaignResult[0]) notFound();
 
   const campaign = campaignResult[0];
+
+  const orgResult = await db
+    .select({ countryCode: organizations.countryCode })
+    .from(organizations)
+    .where(eq(organizations.id, session.organizationId))
+    .limit(1);
+  const countryCode = orgResult[0]?.countryCode ?? "TG";
 
   // Récupérer les leads de cette campagne
   const campaignLeads = await db
@@ -253,7 +260,10 @@ export default async function CampaignDetailPage({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <LeadsImporter campaignId={campaign.id} />
+            <LeadsImporter
+              campaignId={campaign.id}
+              countryCode={countryCode}
+            />
           </CardContent>
         </Card>
 

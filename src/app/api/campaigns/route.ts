@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { campaigns } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { createCampaignSchema } from "@/lib/validations/campaign";
+import { logger } from "@/lib/logger";
 
 export async function GET() {
   try {
@@ -20,7 +21,7 @@ export async function GET() {
 
     return NextResponse.json({ campaigns: result });
   } catch (error) {
-    console.error("[campaigns] GET Erreur:", error);
+    logger.error("campaigns", "GET erreur", { error: String(error) });
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
@@ -53,7 +54,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ campaign: result[0] }, { status: 201 });
   } catch (error) {
-    console.error("[campaigns] POST Erreur:", error);
+    logger.error("campaigns", "POST erreur", { error: String(error) });
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

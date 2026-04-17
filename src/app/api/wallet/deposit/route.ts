@@ -5,6 +5,7 @@ import { wallets, transactions, users } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { depositSchema } from "@/lib/validations/wallet";
 import { logger } from "@/lib/logger";
+import { rateLimit } from "@/lib/rate-limit";
 
 /**
  * Ajustement manuel du wallet — réservé aux owners/admins.
@@ -15,6 +16,14 @@ export async function POST(req: Request) {
     const session = await getUserSession();
     if (!session) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    const rl = rateLimit(`wallet:deposit:${session.organizationId}`, 10, 60_000);
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: "Trop d'ajustements en peu de temps." },
+        { status: 429 }
+      );
     }
 
     const userRow = await db

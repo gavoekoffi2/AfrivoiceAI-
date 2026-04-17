@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { organizations, users, wallets, notifications } from "@/lib/db/schema";
 import { generateSlug } from "@/lib/utils";
 import { eq } from "drizzle-orm";
+import { logger } from "@/lib/logger";
 
 async function generateUniqueSlug(base: string): Promise<string> {
   let slug = generateSlug(base) || `org-${Date.now().toString(36)}`;
@@ -109,13 +110,15 @@ export async function registerAction(formData: FormData) {
       });
     }
   } catch (err) {
-    console.error("[auth/register] Provisioning error:", err);
+    logger.error("auth/register", "Provisioning error", { error: String(err) });
     // Rollback: supprimer l'utilisateur Supabase pour ne pas bloquer un réessai
     try {
       const admin = createSupabaseServiceClient();
       await admin.auth.admin.deleteUser(authUser.id);
     } catch (rollbackErr) {
-      console.error("[auth/register] Rollback failed:", rollbackErr);
+      logger.error("auth/register", "Rollback failed", {
+        error: String(rollbackErr),
+      });
     }
     return {
       error:

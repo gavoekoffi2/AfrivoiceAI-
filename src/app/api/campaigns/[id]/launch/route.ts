@@ -1,16 +1,34 @@
 import { NextResponse } from "next/server";
+import { sql } from "drizzle-orm";
 import { getUserSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { campaigns, leads, calls, wallets } from "@/lib/db/schema";
+import {
+  campaigns,
+  leads,
+  calls,
+  wallets,
+  organizations,
+} from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { hasSufficientBalance } from "@/lib/utils/billing";
 import { getVapiClient, generateProspectingPrompt } from "@/lib/vapi/client";
 import { normalizePhoneNumber } from "@/lib/utils";
+import { logger } from "@/lib/logger";
+import { rateLimit } from "@/lib/rate-limit";
 
-const BATCH_DELAY_MS = 2000; // 2 secondes entre chaque appel
+const BATCH_DELAY_MS = 2000;
+const BATCH_SIZE = 10;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+type WalletLockedRow = { balance_fcfa: string };
+
+function firstRow<T>(executeResult: unknown): T | undefined {
+  if (Array.isArray(executeResult)) return executeResult[0] as T | undefined;
+  const rows = (executeResult as { rows?: unknown[] })?.rows;
+  return rows?.[0] as T | undefined;
 }
 
 export async function POST(
@@ -23,19 +41,37 @@ export async function POST(
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
+    const rl = rateLimit(
+      `campaigns:launch:${session.organizationId}`,
+      5,
+      60_000
+    );
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: "Trop de lancements simultanés. Réessayez dans une minute." },
+        { status: 429 }
+      );
+    }
+
     const campaignId = params.id;
 
-    // Vérifier la campagne
-    const campaignResult = await db
-      .select()
-      .from(campaigns)
-      .where(
-        and(
-          eq(campaigns.id, campaignId),
-          eq(campaigns.organizationId, session.organizationId)
+    const [campaignResult, orgResult] = await Promise.all([
+      db
+        .select()
+        .from(campaigns)
+        .where(
+          and(
+            eq(campaigns.id, campaignId),
+            eq(campaigns.organizationId, session.organizationId)
+          )
         )
-      )
-      .limit(1);
+        .limit(1),
+      db
+        .select({ countryCode: organizations.countryCode })
+        .from(organizations)
+        .where(eq(organizations.id, session.organizationId))
+        .limit(1),
+    ]);
 
     if (!campaignResult[0]) {
       return NextResponse.json(
@@ -45,6 +81,7 @@ export async function POST(
     }
 
     const campaign = campaignResult[0];
+    const countryCode = orgResult[0]?.countryCode || "TG";
 
     if (campaign.status !== "active") {
       return NextResponse.json(
@@ -53,7 +90,6 @@ export async function POST(
       );
     }
 
-    // Vérifier le solde
     const walletResult = await db
       .select()
       .from(wallets)
@@ -70,17 +106,13 @@ export async function POST(
       );
     }
 
-    // Récupérer les leads en attente
     const pendingLeads = await db
       .select()
       .from(leads)
       .where(
-        and(
-          eq(leads.campaignId, campaignId),
-          eq(leads.status, "new")
-        )
+        and(eq(leads.campaignId, campaignId), eq(leads.status, "new"))
       )
-      .limit(10); // Limite à 10 appels par batch
+      .limit(BATCH_SIZE);
 
     if (pendingLeads.length === 0) {
       return NextResponse.json({
@@ -91,23 +123,42 @@ export async function POST(
 
     const vapi = getVapiClient();
     let launched = 0;
+    let invalidPhones = 0;
     const errors: string[] = [];
 
     for (const lead of pendingLeads) {
       try {
-        // Vérifier le solde avant chaque appel
-        const freshWallet = await db
-          .select({ balance: wallets.balanceFcfa })
-          .from(wallets)
-          .where(eq(wallets.organizationId, session.organizationId))
-          .limit(1);
+        const balanceCheck = await db.transaction(async (tx) => {
+          const rows = await tx.execute(
+            sql`SELECT balance_fcfa FROM wallets WHERE organization_id = ${session.organizationId} FOR UPDATE`
+          );
+          const row = firstRow<WalletLockedRow>(rows);
+          if (!row) return { ok: false as const, reason: "no_wallet" };
+          if (!hasSufficientBalance(row.balance_fcfa)) {
+            return { ok: false as const, reason: "low_balance" };
+          }
+          return { ok: true as const };
+        });
 
-        if (!freshWallet[0] || !hasSufficientBalance(freshWallet[0].balance)) {
-          console.log("[batch/launch] Solde insuffisant, arrêt du batch");
+        if (!balanceCheck.ok) {
+          logger.warn("campaigns/launch", "Solde insuffisant, arrêt du batch", {
+            campaignId,
+            organizationId: session.organizationId,
+            reason: balanceCheck.reason,
+          });
           break;
         }
 
-        const phone = normalizePhoneNumber(lead.phone, "TG") ?? lead.phone;
+        const phone = normalizePhoneNumber(lead.phone, countryCode);
+        if (!phone) {
+          await db
+            .update(leads)
+            .set({ status: "invalid_phone" })
+            .where(eq(leads.id, lead.id));
+          invalidPhones++;
+          continue;
+        }
+
         const systemPrompt = generateProspectingPrompt({
           objective: campaign.objective,
           scriptTemplate: campaign.scriptTemplate,
@@ -131,16 +182,21 @@ export async function POST(
             },
             voice: {
               provider: "11labs",
-              voiceId: process.env.ELEVENLABS_VOICE_ID ?? "EXAVITQu4vr4xnSDxMaL",
+              voiceId:
+                process.env.ELEVENLABS_VOICE_ID ?? "EXAVITQu4vr4xnSDxMaL",
             },
             firstMessage: lead.name
               ? `Bonjour ${lead.name}, comment allez-vous ?`
               : "Bonjour, comment allez-vous ?",
             artifactPlan: { recordingEnabled: true },
+            transcriber: {
+              provider: "deepgram",
+              model: "nova-2",
+              language: "fr",
+            },
           },
         })) as unknown as { id: string };
 
-        // Enregistrer l'appel et mettre à jour le lead
         await db.transaction(async (tx) => {
           await tx.insert(calls).values({
             organizationId: session.organizationId,
@@ -157,31 +213,42 @@ export async function POST(
         });
 
         launched++;
-        console.log(`[batch/launch] Appel lancé: ${callResponse.id} → ${phone}`);
+        logger.info("campaigns/launch", "Appel lancé", {
+          vapiCallId: callResponse.id,
+          leadId: lead.id,
+          campaignId,
+        });
 
-        // Délai entre les appels pour éviter les rate limits
         if (launched < pendingLeads.length) {
           await sleep(BATCH_DELAY_MS);
         }
       } catch (err) {
-        console.error(`[batch/launch] Erreur pour lead ${lead.id}:`, err);
+        logger.error("campaigns/launch", "Erreur lead", {
+          leadId: lead.id,
+          campaignId,
+          error: String(err),
+        });
         errors.push(lead.id);
       }
     }
 
-    // Mettre à jour les compteurs de la campagne
-    await db
-      .update(campaigns)
-      .set({ calledLeads: campaign.calledLeads + launched })
-      .where(eq(campaigns.id, campaignId));
+    if (launched > 0) {
+      await db
+        .update(campaigns)
+        .set({ calledLeads: campaign.calledLeads + launched })
+        .where(eq(campaigns.id, campaignId));
+    }
 
     return NextResponse.json({
       launched,
       errors: errors.length,
+      invalidPhones,
       message: `${launched} appel(s) lancé(s) avec succès.`,
     });
   } catch (error) {
-    console.error("[batch/launch] Erreur:", error);
+    logger.error("campaigns/launch", "Erreur serveur", {
+      error: String(error),
+    });
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

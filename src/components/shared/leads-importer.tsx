@@ -9,6 +9,7 @@ import { normalizePhoneNumber } from "@/lib/utils";
 
 interface LeadsImporterProps {
   campaignId: string;
+  countryCode?: string;
 }
 
 interface ParsedLead {
@@ -18,7 +19,10 @@ interface ParsedLead {
   email?: string;
 }
 
-export function LeadsImporter({ campaignId }: LeadsImporterProps) {
+export function LeadsImporter({
+  campaignId,
+  countryCode = "TG",
+}: LeadsImporterProps) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ParsedLead[]>([]);
   const [isPending, startTransition] = useTransition();
@@ -49,7 +53,8 @@ export function LeadsImporter({ campaignId }: LeadsImporterProps) {
           row.numéro ||
           "";
 
-        const normalizedPhone = normalizePhoneNumber(phone, "TG") ?? phone;
+        const normalizedPhone =
+          normalizePhoneNumber(phone, countryCode) ?? phone;
 
         return {
           name: row.nom || row.name || row.prénom || undefined,

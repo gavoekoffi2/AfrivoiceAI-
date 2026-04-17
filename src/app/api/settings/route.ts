@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { organizations } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import * as z from "zod";
+import { revalidatePath } from "next/cache";
 import { logger } from "@/lib/logger";
 
 const domainRegex = /^[a-z0-9.-]+\.[a-z]{2,}$/i;
@@ -98,6 +99,8 @@ export async function PATCH(req: Request) {
         .set(patch)
         .where(eq(organizations.id, session.organizationId))
         .returning();
+      revalidatePath("/dashboard/settings");
+      revalidatePath("/dashboard");
       return NextResponse.json({ organization: updated[0] });
     } catch (err) {
       const code = (err as { code?: string } | undefined)?.code;
