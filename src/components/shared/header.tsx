@@ -1,9 +1,10 @@
 "use client";
 
-import { Bell, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatFcfa } from "@/lib/utils";
+import { NotificationBell } from "./notification-bell";
 
 interface HeaderProps {
   title: string;
@@ -45,9 +46,7 @@ export function Header({ title, walletBalance, onMenuToggle }: HeaderProps) {
           )}
         </div>
 
-        <Button variant="ghost" size="icon">
-          <Bell className="h-5 w-5" />
-        </Button>
+        <NotificationBell />
       </div>
     </header>
   );

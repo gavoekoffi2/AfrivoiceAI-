@@ -2,9 +2,13 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  // Expose le pathname courant aux Server Components via un header custom.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
+
   let supabaseResponse = NextResponse.next({
     request: {
-      headers: request.headers,
+      headers: requestHeaders,
     },
   });
 
@@ -19,14 +23,14 @@ export async function middleware(request: NextRequest) {
         set(name: string, value: string, options: CookieOptions) {
           request.cookies.set({ name, value, ...options });
           supabaseResponse = NextResponse.next({
-            request: { headers: request.headers },
+            request: { headers: requestHeaders },
           });
           supabaseResponse.cookies.set({ name, value, ...options });
         },
         remove(name: string, options: CookieOptions) {
           request.cookies.set({ name, value: "", ...options });
           supabaseResponse = NextResponse.next({
-            request: { headers: request.headers },
+            request: { headers: requestHeaders },
           });
           supabaseResponse.cookies.set({ name, value: "", ...options });
         },

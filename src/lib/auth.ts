@@ -9,6 +9,7 @@ export type UserSession = {
   role: string;
   organizationId: string;
   organizationName: string;
+  onboardingCompleted: boolean;
 };
 
 export async function getUserSession(): Promise<UserSession | null> {
@@ -28,6 +29,7 @@ export async function getUserSession(): Promise<UserSession | null> {
         role: users.role,
         organizationId: users.organizationId,
         organizationName: organizations.name,
+        onboardingCompleted: organizations.onboardingCompleted,
       })
       .from(users)
       .innerJoin(organizations, eq(users.organizationId, organizations.id))

@@ -107,7 +107,13 @@ export function LeadsImporter({ campaignId }: LeadsImporterProps) {
           return;
         }
 
-        toast.success(`${result.count} lead(s) importés avec succès !`);
+        const parts: string[] = [];
+        if (result.imported) parts.push(`${result.imported} importé(s)`);
+        if (result.duplicates)
+          parts.push(`${result.duplicates} doublon(s) ignoré(s)`);
+        if (result.rejected)
+          parts.push(`${result.rejected} numéro(s) invalide(s)`);
+        toast.success(parts.join(" · ") || "Import terminé.");
         setFile(null);
         setPreview([]);
         if (fileInputRef.current) fileInputRef.current.value = "";

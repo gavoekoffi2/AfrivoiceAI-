@@ -115,7 +115,7 @@ export async function POST(
           companyName: lead.company ?? undefined,
         });
 
-        const callResponse = await vapi.calls.create({
+        const callResponse = (await vapi.calls.create({
           phoneNumberId: process.env.VAPI_PHONE_NUMBER_ID!,
           customer: {
             number: phone,
@@ -136,10 +136,9 @@ export async function POST(
             firstMessage: lead.name
               ? `Bonjour ${lead.name}, comment allez-vous ?`
               : "Bonjour, comment allez-vous ?",
-            endCallFunctionEnabled: true,
-            recordingEnabled: true,
+            artifactPlan: { recordingEnabled: true },
           },
-        });
+        })) as unknown as { id: string };
 
         // Enregistrer l'appel et mettre à jour le lead
         await db.transaction(async (tx) => {
