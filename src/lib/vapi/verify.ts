@@ -1,7 +1,8 @@
 import crypto from "crypto";
 
 /**
- * Vérifie la signature du webhook Vapi.ai
+ * Vérifie la signature du webhook Vapi.ai.
+ * En production, un secret manquant provoque un refus ; en dev, tolérant.
  */
 export function verifyVapiWebhook(
   rawBody: string,
@@ -10,7 +11,10 @@ export function verifyVapiWebhook(
   if (!signature) return false;
 
   const secret = process.env.VAPI_WEBHOOK_SECRET;
-  if (!secret) return true; // En dev sans secret configuré
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") return false;
+    return true;
+  }
 
   const computedHash = crypto
     .createHmac("sha256", secret)

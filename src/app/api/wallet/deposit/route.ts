@@ -6,6 +6,7 @@ import { eq, sql } from "drizzle-orm";
 import { depositSchema } from "@/lib/validations/wallet";
 import { logger } from "@/lib/logger";
 import { rateLimit } from "@/lib/rate-limit";
+import { markWebhookProcessed } from "@/lib/idempotency";
 
 /**
  * Ajustement manuel du wallet — réservé aux owners/admins.
@@ -53,30 +54,44 @@ export async function POST(req: Request) {
     }
 
     const { amountFcfa, paymentMethod = "manual" } = validated.data;
+    const requestId =
+      typeof body?.requestId === "string" ? body.requestId : null;
 
-    const walletResult = await db
-      .select()
-      .from(wallets)
-      .where(eq(wallets.organizationId, session.organizationId))
-      .limit(1);
-
-    const wallet = walletResult[0];
-    if (!wallet) {
-      return NextResponse.json(
-        { error: "Wallet introuvable" },
-        { status: 404 }
-      );
+    if (requestId) {
+      const firstTime = await markWebhookProcessed({
+        provider: "manual",
+        externalId: `wallet_deposit_${requestId}`,
+        organizationId: session.organizationId,
+      });
+      if (!firstTime) {
+        return NextResponse.json({
+          success: true,
+          idempotent: true,
+          message: "Requête déjà traitée.",
+        });
+      }
     }
 
     await db.transaction(async (tx) => {
+      const lockedRows = await tx.execute(
+        sql`SELECT id FROM wallets WHERE organization_id = ${session.organizationId} FOR UPDATE`
+      );
+      const lockedRow = Array.isArray(lockedRows)
+        ? (lockedRows as unknown as { id: string }[])[0]
+        : ((lockedRows as unknown as { rows?: { id: string }[] }).rows?.[0]);
+
+      if (!lockedRow) {
+        throw new Error("WALLET_NOT_FOUND");
+      }
+
       await tx.insert(transactions).values({
-        walletId: wallet.id,
+        walletId: lockedRow.id,
         type: "adjustment",
         amountFcfa: amountFcfa.toString(),
         description: `Ajustement manuel (${paymentMethod})`,
         status: "completed",
         provider: "manual",
-        metadata: { paymentMethod, requestedBy: session.id },
+        metadata: { paymentMethod, requestedBy: session.id, requestId },
       });
 
       await tx
@@ -86,7 +101,7 @@ export async function POST(req: Request) {
           lowBalanceAlertSent: false,
           updatedAt: new Date(),
         })
-        .where(eq(wallets.id, wallet.id));
+        .where(eq(wallets.id, lockedRow.id));
     });
 
     logger.info("wallet/deposit", "Ajustement manuel", {
@@ -102,6 +117,12 @@ export async function POST(req: Request) {
       )} FCFA ajoutés au wallet.`,
     });
   } catch (error) {
+    if (error instanceof Error && error.message === "WALLET_NOT_FOUND") {
+      return NextResponse.json(
+        { error: "Wallet introuvable" },
+        { status: 404 }
+      );
+    }
     logger.error("wallet/deposit", "Erreur serveur", { error: String(error) });
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }

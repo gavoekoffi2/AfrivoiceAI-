@@ -3,11 +3,20 @@
 import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server";
 import { registerSchema, loginSchema } from "@/lib/validations/auth";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { organizations, users, wallets, notifications } from "@/lib/db/schema";
 import { generateSlug } from "@/lib/utils";
 import { eq } from "drizzle-orm";
 import { logger } from "@/lib/logger";
+import { rateLimit } from "@/lib/rate-limit";
+
+function getClientIp(): string {
+  const h = headers();
+  const fwd = h.get("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0]!.trim();
+  return h.get("x-real-ip") ?? "unknown";
+}
 
 async function generateUniqueSlug(base: string): Promise<string> {
   let slug = generateSlug(base) || `org-${Date.now().toString(36)}`;
@@ -26,6 +35,14 @@ async function generateUniqueSlug(base: string): Promise<string> {
 }
 
 export async function registerAction(formData: FormData) {
+  const ip = getClientIp();
+  const rl = rateLimit(`auth:register:${ip}`, 5, 60 * 60_000);
+  if (!rl.success) {
+    return {
+      error: "Trop d'inscriptions depuis votre IP. Réessayez plus tard.",
+    };
+  }
+
   const rawData = {
     email: formData.get("email") as string,
     password: formData.get("password") as string,
@@ -130,8 +147,22 @@ export async function registerAction(formData: FormData) {
 }
 
 export async function loginAction(formData: FormData) {
+  const ip = getClientIp();
+  const email = (formData.get("email") as string) ?? "";
+  const rlIp = rateLimit(`auth:login:ip:${ip}`, 10, 15 * 60_000);
+  const rlEmail = rateLimit(
+    `auth:login:email:${email.toLowerCase()}`,
+    5,
+    15 * 60_000
+  );
+  if (!rlIp.success || !rlEmail.success) {
+    return {
+      error: "Trop de tentatives. Réessayez dans quelques minutes.",
+    };
+  }
+
   const rawData = {
-    email: formData.get("email") as string,
+    email,
     password: formData.get("password") as string,
   };
 

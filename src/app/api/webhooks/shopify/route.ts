@@ -193,6 +193,7 @@ export async function POST(req: Request) {
       method: "POST",
       headers: { "Content-Type": "application/json", ...internalHeader() },
       body: JSON.stringify({ orderId: insertedOrder.id }),
+      signal: AbortSignal.timeout(10_000),
     }).catch((err) => {
       logger.error("shopify/webhook", "Erreur déclenchement appel", {
         orderId: insertedOrder.id,

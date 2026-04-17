@@ -20,11 +20,10 @@ export function verifyShopifyWebhook(
     .update(rawBody, "utf8")
     .digest("base64");
 
-  // Comparaison en temps constant pour éviter les timing attacks
-  return crypto.timingSafeEqual(
-    Buffer.from(computedHash),
-    Buffer.from(signature)
-  );
+  const a = Buffer.from(computedHash);
+  const b = Buffer.from(signature);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 }
 
 export function isCashOnDelivery(gateway: string): boolean {

@@ -6,7 +6,7 @@ import { webhookEvents } from "@/lib/db/schema";
  * Retourne false s'il existait déjà (idempotent : deuxième livraison du webhook).
  */
 export async function markWebhookProcessed(params: {
-  provider: "shopify" | "woocommerce" | "vapi" | "stripe";
+  provider: "shopify" | "woocommerce" | "vapi" | "stripe" | "manual";
   externalId: string;
   organizationId?: string | null;
   payload?: unknown;

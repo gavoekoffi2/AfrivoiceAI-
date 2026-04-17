@@ -8,7 +8,7 @@ import {
   transactions,
   notifications,
 } from "@/lib/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and, inArray } from "drizzle-orm";
 import { verifyVapiWebhook } from "@/lib/vapi/verify";
 import { calculateClientCostFcfa, isLowBalance } from "@/lib/utils/billing";
 import { markWebhookProcessed } from "@/lib/idempotency";
@@ -264,7 +264,7 @@ export async function POST(req: Request) {
           await tx
             .update(wallets)
             .set({
-              balanceFcfa: sql`${wallets.balanceFcfa} - ${costFcfa}`,
+              balanceFcfa: sql`GREATEST(${wallets.balanceFcfa} - ${costFcfa}, 0)`,
               updatedAt: new Date(),
             })
             .where(eq(wallets.id, walletRow.id));
@@ -287,11 +287,18 @@ export async function POST(req: Request) {
           no_answer: "no_answer",
         };
         const newStatus = orderStatusMap[outcome];
+        // Transitions autorisées uniquement depuis un état "calling" ou "pending".
+        const allowedFromStatuses = ["calling", "pending"];
         if (newStatus) {
           await tx
             .update(orders)
             .set({ status: newStatus })
-            .where(eq(orders.id, dbCall.orderId));
+            .where(
+              and(
+                eq(orders.id, dbCall.orderId),
+                inArray(orders.status, allowedFromStatuses)
+              )
+            );
         }
       }
 
