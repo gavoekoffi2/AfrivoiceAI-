@@ -22,6 +22,10 @@ http {
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(self)" always;
+    # CSP — autorise les sources nécessaires (Supabase, Vapi, Stripe). Next.js
+    # nécessite 'unsafe-inline'/'unsafe-eval' pour ses scripts hydratation.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://*.supabase.co https://storage.vapi.ai; connect-src 'self' https://*.supabase.co https://api.vapi.ai https://api.stripe.com; frame-src https://js.stripe.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self';" always;
 
     upstream nextjs {
         server web:3000;

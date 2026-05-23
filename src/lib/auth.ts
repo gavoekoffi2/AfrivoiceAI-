@@ -94,8 +94,69 @@ export async function provisionUser(params: {
 }): Promise<UserSession | null> {
   const { authUserId, email, organizationName } = params;
 
-  // Re-check pour éviter une race condition
-  const existing = await db
+  // Fast-path : déjà provisionné
+  const existing = await loadSessionForUser(authUserId);
+  if (existing) return existing;
+
+  try {
+    await db.transaction(async (tx) => {
+      // Re-check atomique : un autre process a-t-il créé l'utilisateur entre-temps ?
+      // PostgreSQL n'a pas de FOR UPDATE sur "row inexistante", on doit donc
+      // s'appuyer sur la contrainte unique (users.id) qui sera détectée par
+      // ON CONFLICT lors de l'INSERT.
+      const slug = await generateUniqueSlug(tx, organizationName);
+      const webhookToken = generateWebhookToken();
+
+      const [org] = await tx
+        .insert(organizations)
+        .values({ name: organizationName, slug, webhookToken })
+        .returning();
+
+      // Si l'user existe déjà (race avec un autre provisionUser parallèle),
+      // ON CONFLICT DO NOTHING : on rollback la transaction côté caller.
+      const userInsert = await tx
+        .insert(users)
+        .values({
+          id: authUserId,
+          organizationId: org.id,
+          email,
+          role: "owner",
+        })
+        .onConflictDoNothing({ target: users.id })
+        .returning({ id: users.id });
+
+      if (userInsert.length === 0) {
+        // Un autre process a gagné — on annule cette transaction pour ne pas
+        // laisser une organization orpheline.
+        throw new ProvisionRaceError();
+      }
+
+      await tx
+        .insert(wallets)
+        .values({ organizationId: org.id, balanceFcfa: "0" })
+        .onConflictDoNothing({ target: wallets.organizationId });
+    });
+
+    return await loadSessionForUser(authUserId);
+  } catch (err) {
+    if (err instanceof ProvisionRaceError) {
+      // L'autre process a gagné la course — on retourne sa session
+      return await loadSessionForUser(authUserId);
+    }
+    log.error("Échec provisionUser", { error: String(err), userId: authUserId });
+    return null;
+  }
+}
+
+class ProvisionRaceError extends Error {
+  constructor() {
+    super("provision_race");
+    this.name = "ProvisionRaceError";
+  }
+}
+
+async function loadSessionForUser(authUserId: string): Promise<UserSession | null> {
+  const result = await db
     .select({
       id: users.id,
       email: users.email,
@@ -107,76 +168,42 @@ export async function provisionUser(params: {
     .innerJoin(organizations, eq(users.organizationId, organizations.id))
     .where(eq(users.id, authUserId))
     .limit(1);
+  return result[0] ?? null;
+}
 
-  if (existing[0]) return existing[0];
-
-  try {
-    const session = await db.transaction(async (tx) => {
-      // Slug unique
-      const baseSlug = generateSlug(organizationName) || "org";
-      let slug = baseSlug;
-      let attempt = 0;
-      while (
-        await tx
-          .select({ id: organizations.id })
-          .from(organizations)
-          .where(eq(organizations.slug, slug))
-          .limit(1)
-          .then((r) => r.length > 0)
-      ) {
-        attempt++;
-        slug = `${baseSlug}-${attempt}`;
-        if (attempt > 100) {
-          slug = `${baseSlug}-${Math.random().toString(36).slice(2, 10)}`;
-          break;
-        }
-      }
-
-      const webhookToken =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "")
-          : Math.random().toString(36).slice(2) + Date.now().toString(36);
-
-      const [org] = await tx
-        .insert(organizations)
-        .values({
-          name: organizationName,
-          slug,
-          webhookToken,
-        })
-        .returning();
-
-      await tx.insert(users).values({
-        id: authUserId,
-        organizationId: org.id,
-        email,
-        role: "owner",
-      });
-
-      await tx.insert(wallets).values({
-        organizationId: org.id,
-        balanceFcfa: "0",
-      });
-
-      return {
-        id: authUserId,
-        email,
-        role: "owner",
-        organizationId: org.id,
-        organizationName: org.name,
-      };
-    });
-
-    log.info("Utilisateur provisionné", {
-      userId: authUserId,
-      orgId: session.organizationId,
-    });
-
-    return session;
-  } catch (err) {
-    log.error("Échec provisionUser", { error: String(err), userId: authUserId });
-    return null;
+async function generateUniqueSlug(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  organizationName: string
+): Promise<string> {
+  const baseSlug = generateSlug(organizationName) || "org";
+  let slug = baseSlug;
+  let attempt = 0;
+  while (
+    await tx
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(eq(organizations.slug, slug))
+      .limit(1)
+      .then((r) => r.length > 0)
+  ) {
+    attempt++;
+    slug = `${baseSlug}-${attempt}`;
+    if (attempt > 100) {
+      slug = `${baseSlug}-${Math.random().toString(36).slice(2, 10)}`;
+      break;
+    }
   }
+  return slug;
+}
+
+function generateWebhookToken(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return (
+      crypto.randomUUID().replace(/-/g, "") +
+      crypto.randomUUID().replace(/-/g, "")
+    );
+  }
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
 /**

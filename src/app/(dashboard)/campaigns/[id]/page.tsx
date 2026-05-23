@@ -25,6 +25,7 @@ import {
   Target,
 } from "lucide-react";
 import { formatFcfa, formatDuration, getCallStatusLabel } from "@/lib/utils";
+import { LEAD_STATUS_LABELS } from "@/types";
 import { LeadsImporter } from "@/components/shared/leads-importer";
 import { CampaignBatchCaller } from "@/components/shared/campaign-batch-caller";
 import { EditCampaignDialog } from "@/components/shared/edit-campaign-dialog";
@@ -113,6 +114,8 @@ export default async function CampaignDetailPage({
     "secondary" | "info" | "success" | "destructive" | "warning"
   > = {
     new: "secondary",
+    queueing: "secondary",
+    calling: "info",
     called: "info",
     qualified: "success",
     not_interested: "destructive",
@@ -314,15 +317,9 @@ export default async function CampaignDetailPage({
                       variant={statusColors[lead.status] ?? "secondary"}
                       className="shrink-0 text-xs ml-2"
                     >
-                      {lead.status === "new"
-                        ? "Nouveau"
-                        : lead.status === "called"
-                        ? "Appelé"
-                        : lead.status === "qualified"
-                        ? "Qualifié"
-                        : lead.status === "not_interested"
-                        ? "Non intéressé"
-                        : "Sans réponse"}
+                      {LEAD_STATUS_LABELS[
+                        lead.status as keyof typeof LEAD_STATUS_LABELS
+                      ] ?? lead.status}
                     </Badge>
                   </div>
                 ))

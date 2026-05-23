@@ -6,7 +6,7 @@ import {
   leads,
   organizations,
 } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import {
   createVapiCallWithRetry,
   buildAssistantConfig,
@@ -32,13 +32,23 @@ export type TriggerResult =
         | "not_found"
         | "invalid_phone"
         | "vapi_error"
-        | "config_error";
+        | "config_error"
+        | "already_calling";
       message: string;
     };
 
 /**
  * Déclenche un appel — commande e-commerce OU lead de campagne.
  * À utiliser depuis les webhooks (Shopify/Woo) ET le dashboard.
+ *
+ * Stratégie d'intégrité :
+ *  1) Réservation atomique en DB (status `calling`, insertion call placeholder)
+ *  2) Appel Vapi
+ *  3) UPDATE du vapiCallId dans la ligne calls
+ *
+ * Si Vapi échoue après réservation : on rollback (suppression call + statut
+ * order/lead remis à pending/new) UNIQUEMENT si le statut actuel est encore
+ * celui qu'on a posé (anti race-condition).
  */
 export async function triggerCall(input: {
   organizationId: string;
@@ -74,6 +84,14 @@ async function triggerEcommerceCall(
     .limit(1);
   if (!order) {
     return { success: false, reason: "not_found", message: "Commande introuvable" };
+  }
+
+  if (order.status === "calling") {
+    return {
+      success: false,
+      reason: "already_calling",
+      message: "Un appel est déjà en cours pour cette commande.",
+    };
   }
 
   const balance = await getBalance(organizationId);
@@ -122,6 +140,34 @@ async function triggerEcommerceCall(
     orderId: order.externalId,
   });
 
+  // 1) Réservation atomique — on ne pose `calling` que si l'order est encore
+  //    dans un état "appelable". Évite les doubles appels concurrents.
+  const reservation = await db
+    .update(orders)
+    .set({
+      status: "calling",
+      callAttempts: sql`${orders.callAttempts} + 1`,
+      lastCallAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(orders.id, order.id),
+        sql`status IN ('pending', 'no_answer', 'cancelled')`
+      )
+    )
+    .returning({ id: orders.id, previousStatus: orders.status });
+
+  if (reservation.length === 0) {
+    return {
+      success: false,
+      reason: "already_calling",
+      message: "Un appel est déjà en cours pour cette commande.",
+    };
+  }
+
+  // 2) Appel Vapi
+  let vapiCallId: string;
   try {
     const callResponse = await createVapiCallWithRetry({
       phoneNumberId,
@@ -132,53 +178,55 @@ async function triggerEcommerceCall(
         outcomeTool: ECOMMERCE_OUTCOME_TOOL,
       }),
     });
-
-    const [dbCall] = await db.transaction(async (tx) => {
-      const result = await tx
-        .insert(calls)
-        .values({
-          organizationId,
-          vapiCallId: callResponse.id,
-          orderId: order.id,
-          type: "ecommerce_confirmation",
-          status: "queued",
-        })
-        .returning();
-
-      await tx
-        .update(orders)
-        .set({
-          status: "calling",
-          callAttempts: order.callAttempts + 1,
-          lastCallAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(orders.id, order.id));
-
-      return result;
-    });
-
-    log.info("Appel e-commerce lancé", {
-      vapiCallId: callResponse.id,
+    vapiCallId = callResponse.id;
+  } catch (err) {
+    log.error("Vapi a refusé l'appel — rollback statut commande", {
+      error: String(err),
       orderId: order.id,
     });
-
-    return {
-      success: true,
-      callId: dbCall.id,
-      vapiCallId: callResponse.id,
-    };
-  } catch (err) {
-    log.error("Erreur création appel Vapi", { error: String(err) });
-    // Rollback statut commande
+    // Rollback seulement si le statut est encore `calling` (race-safe)
     await db
       .update(orders)
-      .set({ status: "pending" })
-      .where(eq(orders.id, order.id));
+      .set({ status: "pending", updatedAt: new Date() })
+      .where(and(eq(orders.id, order.id), eq(orders.status, "calling")));
     return {
       success: false,
       reason: "vapi_error",
       message: "Impossible de lancer l'appel via Vapi",
+    };
+  }
+
+  // 3) Persiste l'enregistrement call. Si l'INSERT rate, on a au moins le
+  //    statut `calling` à débugger côté ops.
+  try {
+    const [dbCall] = await db
+      .insert(calls)
+      .values({
+        organizationId,
+        vapiCallId,
+        orderId: order.id,
+        type: "ecommerce_confirmation",
+        status: "queued",
+      })
+      .returning();
+
+    log.info("Appel e-commerce lancé", {
+      vapiCallId,
+      orderId: order.id,
+      callId: dbCall.id,
+    });
+
+    return { success: true, callId: dbCall.id, vapiCallId };
+  } catch (err) {
+    log.error("INSERT calls a échoué après création Vapi — orphelin possible", {
+      error: String(err),
+      vapiCallId,
+      orderId: order.id,
+    });
+    return {
+      success: false,
+      reason: "vapi_error",
+      message: "Erreur de persistance après création de l'appel",
     };
   }
 }
@@ -252,6 +300,31 @@ async function triggerProspectingCall(
     companyName: lead.company ?? undefined,
   });
 
+  // 1) Réservation : on passe le lead en "calling" depuis (new|queueing|no_answer)
+  const reservation = await db
+    .update(leads)
+    .set({
+      status: "calling",
+      callAttempts: sql`${leads.callAttempts} + 1`,
+    })
+    .where(
+      and(
+        eq(leads.id, leadId),
+        sql`status IN ('new', 'queueing', 'no_answer')`
+      )
+    )
+    .returning({ id: leads.id });
+
+  if (reservation.length === 0) {
+    return {
+      success: false,
+      reason: "already_calling",
+      message: "Ce lead a déjà un appel en cours ou est dans un état terminal.",
+    };
+  }
+
+  // 2) Appel Vapi
+  let vapiCallId: string;
   try {
     const callResponse = await createVapiCallWithRetry({
       phoneNumberId,
@@ -265,43 +338,60 @@ async function triggerProspectingCall(
         voiceId: campaign.voiceId ?? undefined,
       }),
     });
-
-    const [dbCall] = await db.transaction(async (tx) => {
-      const result = await tx
-        .insert(calls)
-        .values({
-          organizationId,
-          vapiCallId: callResponse.id,
-          leadId,
-          type: "prospecting",
-          status: "queued",
-        })
-        .returning();
-
-      await tx
-        .update(leads)
-        .set({ status: "called", callAttempts: lead.callAttempts + 1 })
-        .where(eq(leads.id, leadId));
-
-      return result;
-    });
-
-    log.info("Appel prospection lancé", {
-      vapiCallId: callResponse.id,
+    vapiCallId = callResponse.id;
+  } catch (err) {
+    log.error("Vapi a refusé l'appel — rollback lead", {
+      error: String(err),
       leadId,
     });
-
-    return {
-      success: true,
-      callId: dbCall.id,
-      vapiCallId: callResponse.id,
-    };
-  } catch (err) {
-    log.error("Erreur création appel Vapi", { error: String(err) });
+    // Rollback seulement si encore en `calling`
+    await db
+      .update(leads)
+      .set({ status: "new" })
+      .where(and(eq(leads.id, leadId), eq(leads.status, "calling")));
     return {
       success: false,
       reason: "vapi_error",
-      message: "Impossible de lancer l'appel via Vapi",
+      message: "Impossible de lancer l'appel Vapi",
+    };
+  }
+
+  // 3) Persiste l'enregistrement call
+  try {
+    const [dbCall] = await db
+      .insert(calls)
+      .values({
+        organizationId,
+        vapiCallId,
+        leadId,
+        type: "prospecting",
+        status: "queued",
+      })
+      .returning();
+
+    // Marque le lead comme appelé (l'appel est en cours côté Vapi)
+    await db
+      .update(leads)
+      .set({ status: "called" })
+      .where(and(eq(leads.id, leadId), eq(leads.status, "calling")));
+
+    log.info("Appel prospection lancé", {
+      vapiCallId,
+      leadId,
+      callId: dbCall.id,
+    });
+
+    return { success: true, callId: dbCall.id, vapiCallId };
+  } catch (err) {
+    log.error("INSERT calls a échoué après création Vapi — orphelin possible", {
+      error: String(err),
+      vapiCallId,
+      leadId,
+    });
+    return {
+      success: false,
+      reason: "vapi_error",
+      message: "Erreur de persistance après création de l'appel",
     };
   }
 }

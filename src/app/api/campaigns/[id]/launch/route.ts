@@ -9,6 +9,8 @@ import { hasSufficientBalance } from "@/lib/utils/billing";
 import { rateLimit, getClientIp } from "@/lib/utils/rate-limit";
 import { createLogger } from "@/lib/utils/logger";
 
+export const dynamic = "force-dynamic";
+
 const log = createLogger("api/campaigns/launch");
 const BATCH_SIZE = 10;
 const INTER_CALL_DELAY_MS = 800;

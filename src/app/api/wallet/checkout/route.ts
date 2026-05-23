@@ -4,6 +4,8 @@ import { getUserSession } from "@/lib/auth";
 import { getStripeClient, isStripeConfigured } from "@/lib/stripe/client";
 import { rateLimit, getClientIp } from "@/lib/utils/rate-limit";
 
+export const dynamic = "force-dynamic";
+
 const bodySchema = z.object({
   amountFcfa: z
     .number()

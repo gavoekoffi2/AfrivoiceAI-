@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { calls, leads, orders } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+
 function escapeCsv(value: unknown): string {
   if (value === null || value === undefined) return "";
   const str = String(value);

@@ -6,6 +6,8 @@ import { organizations } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Régénère le webhook_token de l'organisation.
  * À utiliser si le token a été compromis.

@@ -130,7 +130,13 @@ export function LeadsImporter({ campaignId, onImported }: LeadsImporterProps) {
           return;
         }
 
-        toast.success(`${result.count} lead(s) importés avec succès !`);
+        const dupMsg =
+          result.duplicates && result.duplicates > 0
+            ? ` (${result.duplicates} doublon(s) ignoré(s))`
+            : "";
+        toast.success(
+          `${result.count} lead(s) importé(s) avec succès !${dupMsg}`
+        );
         setFile(null);
         setPreview([]);
         setTotalCount(0);

@@ -42,10 +42,17 @@ export function AudioPlayer({ src }: AudioPlayerProps) {
 
     if (isPlaying) {
       audio.pause();
+      setIsPlaying(false);
     } else {
-      audio.play();
+      // play() peut rejeter à cause de la autoplay policy (mobile, focus, etc.)
+      audio
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch((err) => {
+          console.warn("[audio] Lecture refusée :", err);
+          setIsPlaying(false);
+        });
     }
-    setIsPlaying(!isPlaying);
   }
 
   function handleSeek(value: number[]) {

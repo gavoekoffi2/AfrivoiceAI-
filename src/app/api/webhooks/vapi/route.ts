@@ -9,6 +9,8 @@ import { recordWebhookEvent } from "@/lib/webhooks/idempotency";
 import { vapiWebhookSchema } from "@/lib/validations/webhooks";
 import { createLogger } from "@/lib/utils/logger";
 
+export const dynamic = "force-dynamic";
+
 const log = createLogger("vapi/webhook");
 
 type EcommerceOutcome = "confirmed" | "cancelled" | "no_answer" | "voicemail";
@@ -122,6 +124,16 @@ export async function POST(req: Request) {
   try {
     // --- Status update : maj statut seul ----------------------------------
     if (type === "status-update" && call) {
+      // Idempotency : on s'appuie sur (call_id, status) pour éviter les
+      // mises à jour redondantes. Vapi rejoue parfois les status-updates.
+      const eventKey = `status:${call.id}:${call.status ?? "unknown"}`;
+      const { isNew: statusIsNew } = await recordWebhookEvent({
+        source: "vapi",
+        externalEventId: eventKey,
+      });
+      if (!statusIsNew) {
+        return NextResponse.json({ received: true, duplicate: true });
+      }
       await db
         .update(calls)
         .set({ status: call.status ?? "in-progress", updatedAt: new Date() })

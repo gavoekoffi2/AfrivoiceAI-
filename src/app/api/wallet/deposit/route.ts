@@ -5,6 +5,8 @@ import { creditWallet, WalletError } from "@/lib/wallet/service";
 import { rateLimit, getClientIp } from "@/lib/utils/rate-limit";
 import { createLogger } from "@/lib/utils/logger";
 
+export const dynamic = "force-dynamic";
+
 const log = createLogger("api/wallet/deposit");
 
 export async function POST(req: Request) {

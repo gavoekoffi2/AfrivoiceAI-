@@ -13,6 +13,8 @@ import { triggerCall } from "@/lib/calls/trigger";
 import { rateLimit, getClientIp } from "@/lib/utils/rate-limit";
 import { createLogger } from "@/lib/utils/logger";
 
+export const dynamic = "force-dynamic";
+
 const log = createLogger("woocommerce/webhook");
 
 export async function POST(req: Request) {
@@ -73,6 +75,14 @@ export async function POST(req: Request) {
           "Organisation introuvable. Configurez votre webhook avec ?token=… ou enregistrez le domaine de votre boutique.",
       },
       { status: 404 }
+    );
+  }
+
+  const rlOrg = rateLimit(`woocommerce:org:${organization.id}`, 300, 60_000);
+  if (!rlOrg.success) {
+    return NextResponse.json(
+      { error: "Quota webhook organisation dépassé" },
+      { status: 429 }
     );
   }
 

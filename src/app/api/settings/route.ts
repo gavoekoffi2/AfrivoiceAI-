@@ -7,6 +7,8 @@ import { updateOrganizationSchema } from "@/lib/validations/organization";
 import { revalidatePath } from "next/cache";
 import { createLogger } from "@/lib/utils/logger";
 
+export const dynamic = "force-dynamic";
+
 const log = createLogger("api/settings");
 
 export async function GET() {

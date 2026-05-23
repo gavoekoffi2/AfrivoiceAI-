@@ -186,26 +186,36 @@ export async function importLeadsFromCsvAction(
   }
 
   try {
-    // Insertion par batch pour éviter les énormes requêtes
+    // Insertion par batch avec ON CONFLICT DO NOTHING (unique (campaign_id, phone)).
     const BATCH_SIZE = 500;
     let inserted = 0;
+    let duplicates = 0;
     for (let i = 0; i < validLeads.length; i += BATCH_SIZE) {
       const batch = validLeads.slice(i, i + BATCH_SIZE);
-      const result = await db.insert(leads).values(batch).returning({ id: leads.id });
+      const result = await db
+        .insert(leads)
+        .values(batch)
+        .onConflictDoNothing({
+          target: [leads.campaignId, leads.phone],
+        })
+        .returning({ id: leads.id });
       inserted += result.length;
+      duplicates += batch.length - result.length;
     }
 
     // Compteur atomique sur la campagne
-    await db
-      .update(campaigns)
-      .set({
-        totalLeads: sql`${campaigns.totalLeads} + ${inserted}`,
-        updatedAt: new Date(),
-      })
-      .where(eq(campaigns.id, campaignId));
+    if (inserted > 0) {
+      await db
+        .update(campaigns)
+        .set({
+          totalLeads: sql`${campaigns.totalLeads} + ${inserted}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(campaigns.id, campaignId));
+    }
 
     revalidatePath(`/dashboard/campaigns/${campaignId}`);
-    return { success: true, count: inserted };
+    return { success: true, count: inserted, duplicates };
   } catch (err) {
     log.error("Import leads échoué", { error: String(err) });
     return { error: "Erreur lors de l'import des leads." };

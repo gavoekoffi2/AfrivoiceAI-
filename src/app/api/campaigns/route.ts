@@ -5,6 +5,8 @@ import { campaigns } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { createCampaignSchema } from "@/lib/validations/campaign";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const session = await getUserSession();

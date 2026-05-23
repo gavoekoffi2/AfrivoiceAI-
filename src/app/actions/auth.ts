@@ -167,6 +167,33 @@ export async function resetPasswordAction(formData: FormData) {
   }
 
   const supabase = createSupabaseServerClient();
+
+  // Vérification que l'utilisateur est bien dans un flow de recovery
+  // (lien de réinitialisation cliqué récemment). Sinon n'importe quel user
+  // connecté pourrait changer son mot de passe sans connaître l'ancien.
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return {
+      error:
+        "Lien de réinitialisation invalide ou expiré. Veuillez demander un nouveau lien.",
+    };
+  }
+
+  // Le flow recovery met le user en mode "recovery" via amr (Auth Method Reference)
+  // — vérifié via l'event de session. À défaut, on s'assure que l'utilisateur
+  // n'a PAS de session persistante (juste un access token issu du lien).
+  const recoveredAt = user.recovery_sent_at ?? user.user_metadata?.recovery_sent_at;
+  if (!recoveredAt) {
+    return {
+      error:
+        "Cette page nécessite d'avoir cliqué sur le lien de réinitialisation reçu par email. Pour changer votre mot de passe, utilisez la section Paramètres → Sécurité.",
+    };
+  }
+
   const { error } = await supabase.auth.updateUser({
     password: validated.data.password,
   });
@@ -175,7 +202,10 @@ export async function resetPasswordAction(formData: FormData) {
     return { error: error.message };
   }
 
-  return { success: true, message: "Mot de passe mis à jour." };
+  // On déconnecte pour forcer une reconnexion avec le nouveau mot de passe
+  await supabase.auth.signOut();
+
+  return { success: true, message: "Mot de passe mis à jour. Connectez-vous." };
 }
 
 export async function changePasswordAction(formData: FormData) {

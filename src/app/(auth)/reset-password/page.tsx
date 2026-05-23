@@ -28,7 +28,7 @@ export default function ResetPasswordPage() {
         return;
       }
       toast.success(result?.message ?? "Mot de passe mis à jour.");
-      router.push("/dashboard");
+      router.push("/login");
     });
   }
 

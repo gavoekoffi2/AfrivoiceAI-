@@ -5,6 +5,8 @@ import { triggerCall, type TriggerResult } from "@/lib/calls/trigger";
 import { rateLimit, getClientIp } from "@/lib/utils/rate-limit";
 import { createLogger } from "@/lib/utils/logger";
 
+export const dynamic = "force-dynamic";
+
 const log = createLogger("api/calls/initiate");
 
 const bodySchema = z.union([

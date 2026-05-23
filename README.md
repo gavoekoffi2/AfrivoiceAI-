@@ -120,15 +120,54 @@ npm run db:studio        # Drizzle Studio
 ### Vercel / Netlify
 Standard Next.js. Définir toutes les variables d'env du `.env.example`.
 
+**Migrations en production :**
+- À chaque déploiement avec changement de schéma, exécuter `npm run db:push`
+  (ou intégrer cette étape dans le pipeline CI/CD avant le déploiement).
+- Pour Supabase : appliquer aussi `0002_auth_triggers.sql` une seule fois via
+  le SQL editor du dashboard Supabase.
+
 ### Docker Compose (self-hosted)
 
 ```bash
+# 1. Copier .env.example en .env, renseigner toutes les variables (notamment SERVER_NAME=mon-domaine.com)
+cp .env.example .env
+
+# 2. Placer les certificats SSL
+mkdir -p nginx/ssl
+# nginx/ssl/cert.pem  (chaîne complète)
+# nginx/ssl/key.pem   (clé privée)
+#   → via Let's Encrypt (certbot) ou votre fournisseur
+
+# 3. Lancer
 docker compose up -d --build
 # → app sur :3000, postgres sur :5432, nginx sur :80/:443
 ```
 
-Pour Nginx + HTTPS : placer le certificat dans `nginx/ssl/{cert,key}.pem`
-et mettre à jour `server_name` dans `nginx/nginx.conf`.
+L'image Nginx substitue `${SERVER_NAME}` au démarrage via envsubst.
+
+### Variables d'environnement critiques
+
+| Variable | Notes |
+|---|---|
+| `DATABASE_URL` | URL Postgres (Supabase ou self-hosted) |
+| `DATABASE_POOL_MAX` | **3 sur Supabase** (PgBouncer mode transaction). **10-20** sur Postgres self-hosted |
+| `INTERNAL_API_SECRET` | Générer via `openssl rand -hex 32`. Utilisé par les webhooks → API internes |
+| `VAPI_WEBHOOK_SECRET` | **OBLIGATOIRE en prod**. Le webhook est rejeté sans ce secret |
+| `SHOPIFY_WEBHOOK_SECRET`, `WOOCOMMERCE_WEBHOOK_SECRET`, `STRIPE_WEBHOOK_SECRET` | Idem |
+| `NEXT_PUBLIC_SITE_URL` | URL publique complète (HTTPS) pour les redirects Stripe & emails Supabase |
+| `SERVER_NAME` | Hostname utilisé par Nginx (docker-compose) |
+
+### Headers de sécurité
+
+Nginx applique : HSTS, CSP, X-Frame-Options, X-Content-Type-Options,
+Referrer-Policy, Permissions-Policy. La CSP autorise Stripe, Vapi et Supabase
+en `connect-src`. Adapter si vous ajoutez d'autres CDN.
+
+### Observabilité
+
+Le logger emet du JSON structuré en prod (vers stdout). Connecter à un
+agrégateur (Datadog, Logflare, Better Stack, etc.) via le sidecar Docker ou
+le driver de logs Vercel.
 
 ## Roadmap
 

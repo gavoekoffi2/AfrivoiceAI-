@@ -211,6 +211,10 @@ export const leads = pgTable(
     campaignIdx: index("leads_campaign_idx").on(table.campaignId),
     statusIdx: index("leads_status_idx").on(table.status),
     phoneIdx: index("leads_phone_idx").on(table.phone),
+    campaignPhoneUnique: uniqueIndex("leads_campaign_phone_idx").on(
+      table.campaignId,
+      table.phone
+    ),
   })
 );
 

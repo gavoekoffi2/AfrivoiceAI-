@@ -69,6 +69,7 @@ services:
       retries: 5
 
   # ===== Reverse proxy Nginx avec SSL =====
+  # Utilise nginx:alpine + envsubst pour substituer ${SERVER_NAME} au démarrage.
   nginx:
     image: nginx:alpine
     container_name: afrivoice-nginx
@@ -76,10 +77,18 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      SERVER_NAME: ${SERVER_NAME:-localhost}
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx.conf.template:/etc/nginx/templates/nginx.conf.template:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
       - nginx_cache:/var/cache/nginx
+    # L'image nginx:alpine substitue automatiquement les variables présentes
+    # dans /etc/nginx/templates/*.template via envsubst (variable
+    # NGINX_ENVSUBST_OUTPUT_DIR), puis lance nginx.
+    command: >
+      sh -c "envsubst '$$SERVER_NAME' < /etc/nginx/templates/nginx.conf.template
+             > /etc/nginx/nginx.conf && exec nginx -g 'daemon off;'"
     depends_on:
       - web
     networks:

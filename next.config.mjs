@@ -4,9 +4,14 @@ const nextConfig = {
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "**.supabase.co" },
+      { protocol: "https", hostname: "**.supabase.in" },
       { protocol: "https", hostname: "storage.vapi.ai" },
+      { protocol: "https", hostname: "**.elevenlabs.io" },
+      { protocol: "https", hostname: "*.googleusercontent.com" },
     ],
   },
+  poweredByHeader: false,
+  reactStrictMode: true,
   experimental: {
     serverActions: {
       allowedOrigins: [

@@ -116,6 +116,19 @@ export async function debitWallet(input: WalletDebitInput) {
   }
 
   return db.transaction(async (tx) => {
+    // 1) Acquérir le lock AVANT toute lecture concurrente
+    const [wallet] = await tx
+      .select()
+      .from(wallets)
+      .where(eq(wallets.organizationId, input.organizationId))
+      .for("update")
+      .limit(1);
+
+    if (!wallet) throw new WalletError("Wallet introuvable", "wallet_not_found");
+
+    // 2) Idempotency check APRÈS le lock — sinon deux requêtes parallèles
+    //    avec la même clé peuvent toutes deux passer le check avant qu'aucune
+    //    n'ait commit. La contrainte UNIQUE en DB est l'ultime garde-fou.
     if (input.idempotencyKey) {
       const existing = await tx
         .select({ id: transactions.id })
@@ -129,15 +142,6 @@ export async function debitWallet(input: WalletDebitInput) {
         return { newBalanceFcfa: null, skipped: true as const };
       }
     }
-
-    const [wallet] = await tx
-      .select()
-      .from(wallets)
-      .where(eq(wallets.organizationId, input.organizationId))
-      .for("update")
-      .limit(1);
-
-    if (!wallet) throw new WalletError("Wallet introuvable", "wallet_not_found");
 
     const currentBalance = parseFloat(wallet.balanceFcfa);
     const newBalance = currentBalance - input.amountFcfa;
@@ -158,15 +162,30 @@ export async function debitWallet(input: WalletDebitInput) {
       })
       .where(eq(wallets.id, wallet.id));
 
-    await tx.insert(transactions).values({
-      walletId: wallet.id,
-      type: "call_cost",
-      amountFcfa: (-input.amountFcfa).toFixed(2),
-      balanceAfterFcfa: newBalance.toFixed(2),
-      description: input.description,
-      metadata: input.metadata as never,
-      idempotencyKey: input.idempotencyKey,
-    });
+    try {
+      await tx.insert(transactions).values({
+        walletId: wallet.id,
+        type: "call_cost",
+        amountFcfa: (-input.amountFcfa).toFixed(2),
+        balanceAfterFcfa: newBalance.toFixed(2),
+        description: input.description,
+        metadata: input.metadata as never,
+        idempotencyKey: input.idempotencyKey,
+      });
+    } catch (err) {
+      // Contrainte UNIQUE sur idempotency_key : un autre process a gagné la course
+      const msg = String(err);
+      if (
+        input.idempotencyKey &&
+        (msg.includes("duplicate") || msg.includes("unique"))
+      ) {
+        log.info("Débit ignoré (idempotency uniq DB)", {
+          idempotencyKey: input.idempotencyKey,
+        });
+        return { newBalanceFcfa: null, skipped: true as const };
+      }
+      throw err;
+    }
 
     log.info("Wallet débité", {
       organizationId: input.organizationId,
