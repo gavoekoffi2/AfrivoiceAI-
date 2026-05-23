@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ export function WalletDepositButton() {
   const [showForm, setShowForm] = useState(false);
   const [amount, setAmount] = useState("");
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   function handleDeposit() {
     const amountNum = parseFloat(amount);
@@ -30,9 +32,17 @@ export function WalletDepositButton() {
 
     startTransition(async () => {
       try {
+        const idempotencyKey =
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random()}`;
+
         const res = await fetch("/api/wallet/deposit", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotencyKey,
+          },
           body: JSON.stringify({ amountFcfa: amountNum }),
         });
 
@@ -46,8 +56,7 @@ export function WalletDepositButton() {
         toast.success(data.message);
         setShowForm(false);
         setAmount("");
-        // Rafraîchir la page pour voir le nouveau solde
-        window.location.reload();
+        router.refresh();
       } catch {
         toast.error("Erreur réseau. Veuillez réessayer.");
       }
@@ -68,11 +77,10 @@ export function WalletDepositButton() {
       <CardHeader className="pb-3">
         <CardTitle className="text-base">Recharger le wallet</CardTitle>
         <CardDescription>
-          Simulation de recharge (intégration Mobile Money à venir)
+          Recharge manuelle (intégration Mobile Money à venir)
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Montants prédéfinis */}
         <div className="grid grid-cols-3 gap-2">
           {PRESET_AMOUNTS.map((preset) => (
             <Button
@@ -96,6 +104,7 @@ export function WalletDepositButton() {
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             min={1000}
+            inputMode="numeric"
           />
         </div>
 

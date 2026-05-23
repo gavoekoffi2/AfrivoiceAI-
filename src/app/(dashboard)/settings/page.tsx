@@ -11,43 +11,43 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  Settings,
   Mic2,
   Globe,
   PhoneCall,
   Key,
   Building,
   Webhook,
-  ShoppingCart,
   CheckCircle,
   AlertTriangle,
   User,
   Info,
+  Lock,
 } from "lucide-react";
 import { getExchangeRateInfo } from "@/lib/utils/billing";
 import { SettingsForm } from "@/components/shared/settings-form";
+import { ChangePasswordForm } from "@/components/shared/change-password-form";
+import { WebhookUrls } from "@/components/shared/webhook-urls";
+import { isStripeConfigured } from "@/lib/stripe/client";
 
 export default async function SettingsPage() {
   const session = await getUserSession();
   if (!session) redirect("/login");
 
-  const orgResult = await db
+  const [organization] = await db
     .select()
     .from(organizations)
     .where(eq(organizations.id, session.organizationId))
     .limit(1);
 
-  const organization = orgResult[0];
   const rateInfo = getExchangeRateInfo();
-
   const baseUrl =
     process.env.NEXT_PUBLIC_SITE_URL ?? "https://votre-domaine.com";
+  const stripeConfigured = isStripeConfigured();
 
   const apiKeys = [
     {
@@ -55,33 +55,42 @@ export default async function SettingsPage() {
       env: "VAPI_API_KEY",
       status: !!process.env.VAPI_API_KEY,
       description: "Orchestration des appels vocaux",
-      docUrl: "https://vapi.ai",
     },
     {
       label: "ElevenLabs API Key",
       env: "ELEVENLABS_API_KEY",
       status: !!process.env.ELEVENLABS_API_KEY,
       description: "Génération de voix réalistes",
-      docUrl: "https://elevenlabs.io",
     },
     {
       label: "Google Gemini API Key",
       env: "GEMINI_API_KEY",
       status: !!process.env.GEMINI_API_KEY,
       description: "Modèle de langage conversationnel",
-      docUrl: "https://ai.google.dev",
+    },
+    {
+      label: "Vapi Webhook Secret",
+      env: "VAPI_WEBHOOK_SECRET",
+      status: !!process.env.VAPI_WEBHOOK_SECRET,
+      description: "Vérification des callbacks Vapi",
     },
     {
       label: "Shopify Webhook Secret",
       env: "SHOPIFY_WEBHOOK_SECRET",
       status: !!process.env.SHOPIFY_WEBHOOK_SECRET,
-      description: "Sécurisation des webhooks Shopify",
+      description: "Vérification HMAC des webhooks Shopify",
     },
     {
       label: "WooCommerce Webhook Secret",
       env: "WOOCOMMERCE_WEBHOOK_SECRET",
       status: !!process.env.WOOCOMMERCE_WEBHOOK_SECRET,
-      description: "Sécurisation des webhooks WooCommerce",
+      description: "Vérification des webhooks WooCommerce",
+    },
+    {
+      label: "Stripe (paiement)",
+      env: "STRIPE_SECRET_KEY",
+      status: !!process.env.STRIPE_SECRET_KEY,
+      description: "Recharge wallet par carte bancaire",
     },
   ];
 
@@ -108,15 +117,14 @@ export default async function SettingsPage() {
       )}
 
       <Tabs defaultValue="general">
-        <TabsList className="grid w-full grid-cols-3 md:w-auto md:grid-cols-none md:flex">
+        <TabsList className="grid w-full grid-cols-4 md:w-auto md:grid-cols-none md:flex">
           <TabsTrigger value="general">Général</TabsTrigger>
+          <TabsTrigger value="security">Sécurité</TabsTrigger>
           <TabsTrigger value="integrations">Intégrations</TabsTrigger>
           <TabsTrigger value="billing">Facturation</TabsTrigger>
         </TabsList>
 
-        {/* Onglet Général */}
         <TabsContent value="general" className="space-y-4 mt-4">
-          {/* Organisation */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -126,14 +134,17 @@ export default async function SettingsPage() {
             </CardHeader>
             <CardContent>
               <SettingsForm
-                organizationId={session.organizationId}
                 initialName={organization?.name ?? ""}
                 initialShopName={organization?.shopName ?? ""}
+                initialShopifyDomain={organization?.shopifyDomain ?? ""}
+                initialWoocommerceDomain={organization?.woocommerceDomain ?? ""}
+                initialLowBalanceThreshold={parseFloat(
+                  organization?.lowBalanceThresholdFcfa ?? "5000"
+                )}
               />
             </CardContent>
           </Card>
 
-          {/* Compte utilisateur */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -159,7 +170,6 @@ export default async function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Coming Soon */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
@@ -180,7 +190,7 @@ export default async function SettingsPage() {
                     icon: User,
                     title: "Clonage Vocal Personnalisé",
                     description:
-                      "Clonez votre voix pour des appels ultra-personnalisés et authentiques.",
+                      "Clonez votre voix pour des appels ultra-personnalisés.",
                   },
                   {
                     icon: Globe,
@@ -207,9 +217,24 @@ export default async function SettingsPage() {
           </Card>
         </TabsContent>
 
-        {/* Onglet Intégrations */}
+        <TabsContent value="security" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lock className="h-5 w-5 text-primary" />
+                Changer de mot de passe
+              </CardTitle>
+              <CardDescription>
+                Choisissez un mot de passe robuste (8 caractères min., majuscule, chiffre)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ChangePasswordForm />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="integrations" className="space-y-4 mt-4">
-          {/* Clés API */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -217,14 +242,16 @@ export default async function SettingsPage() {
                 Clés API ({configuredCount}/{apiKeys.length} configurées)
               </CardTitle>
               <CardDescription>
-                Configurez dans <code className="text-xs bg-muted px-1 rounded">.env.local</code> à la racine du projet
+                Configurez dans{" "}
+                <code className="text-xs bg-muted px-1 rounded">.env.local</code>{" "}
+                à la racine du projet
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               {apiKeys.map((api) => (
                 <div
                   key={api.env}
-                  className="flex items-center justify-between rounded-md border p-3"
+                  className="flex items-center justify-between rounded-md border p-3 gap-2"
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -253,7 +280,6 @@ export default async function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Webhooks */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -262,54 +288,19 @@ export default async function SettingsPage() {
               </CardTitle>
               <CardDescription>
                 Copiez ces URLs dans vos plateformes pour activer les
-                intégrations
+                intégrations. Le token URL identifie votre organisation.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {[
-                {
-                  label: "Shopify — Création de commande",
-                  icon: ShoppingCart,
-                  path: "/api/webhooks/shopify",
-                  instructions:
-                    "Shopify Admin → Paramètres → Notifications → Webhooks → Créer un webhook (Topic: orders/create)",
-                },
-                {
-                  label: "WooCommerce — Création de commande",
-                  icon: ShoppingCart,
-                  path: "/api/webhooks/woocommerce",
-                  instructions:
-                    "WooCommerce → Paramètres → Avancé → Webhooks → Ajouter un webhook (Topic: Order created)",
-                },
-                {
-                  label: "Vapi.ai — Statut des appels",
-                  icon: PhoneCall,
-                  path: "/api/webhooks/vapi",
-                  instructions:
-                    "Dashboard Vapi → Settings → Webhooks → Server URL",
-                },
-              ].map((wh) => (
-                <div key={wh.path} className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <wh.icon className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm font-medium">{wh.label}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 rounded-md bg-muted p-2 text-xs font-mono break-all">
-                      {baseUrl}{wh.path}
-                    </code>
-                  </div>
-                  <p className="text-xs text-muted-foreground pl-1">
-                    {wh.instructions}
-                  </p>
-                  <Separator className="mt-2" />
-                </div>
-              ))}
+            <CardContent>
+              <WebhookUrls
+                baseUrl={baseUrl}
+                webhookToken={organization?.webhookToken ?? ""}
+                stripeConfigured={stripeConfigured}
+              />
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Onglet Facturation */}
         <TabsContent value="billing" className="space-y-4 mt-4">
           <Card>
             <CardHeader>
@@ -365,28 +356,35 @@ export default async function SettingsPage() {
                 </p>
                 <div className="space-y-2">
                   {[
-                    { duration: "30 secondes", usd: 0.01, fcfa: Math.ceil(0.01 * rateInfo.rateUsdToFcfa * (1 + rateInfo.marginPercentage / 100)) },
-                    { duration: "1 minute", usd: 0.02, fcfa: Math.ceil(0.02 * rateInfo.rateUsdToFcfa * (1 + rateInfo.marginPercentage / 100)) },
-                    { duration: "2 minutes", usd: 0.04, fcfa: Math.ceil(0.04 * rateInfo.rateUsdToFcfa * (1 + rateInfo.marginPercentage / 100)) },
-                    { duration: "5 minutes", usd: 0.10, fcfa: Math.ceil(0.10 * rateInfo.rateUsdToFcfa * (1 + rateInfo.marginPercentage / 100)) },
-                  ].map((ex) => (
-                    <div
-                      key={ex.duration}
-                      className="flex items-center justify-between text-sm"
-                    >
-                      <span className="text-muted-foreground">
-                        {ex.duration}
-                      </span>
-                      <div className="flex items-center gap-4">
-                        <span className="text-xs text-muted-foreground">
-                          ${ex.usd.toFixed(2)} brut
+                    { duration: "30 secondes", usd: 0.01 },
+                    { duration: "1 minute", usd: 0.02 },
+                    { duration: "2 minutes", usd: 0.04 },
+                    { duration: "5 minutes", usd: 0.1 },
+                  ].map((ex) => {
+                    const fcfa = Math.ceil(
+                      ex.usd *
+                        rateInfo.rateUsdToFcfa *
+                        (1 + rateInfo.marginPercentage / 100)
+                    );
+                    return (
+                      <div
+                        key={ex.duration}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <span className="text-muted-foreground">
+                          {ex.duration}
                         </span>
-                        <span className="font-medium">
-                          {ex.fcfa.toLocaleString("fr-TG")} FCFA
-                        </span>
+                        <div className="flex items-center gap-4">
+                          <span className="text-xs text-muted-foreground">
+                            ${ex.usd.toFixed(2)} brut
+                          </span>
+                          <span className="font-medium">
+                            {fcfa.toLocaleString("fr-TG")} FCFA
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </CardContent>

@@ -1,33 +1,37 @@
-import crypto from "crypto";
+import { hmacSha256Base64, safeCompare } from "@/lib/utils/hmac";
+import { isProduction } from "@/lib/utils/env";
+import { createLogger } from "@/lib/utils/logger";
+
+const log = createLogger("shopify");
 
 /**
- * Vérifie la signature HMAC-SHA256 du webhook Shopify
+ * Vérifie la signature HMAC-SHA256 du webhook Shopify.
+ * - En production : échec systématique si le secret n'est pas configuré.
+ * - En dev : log d'avertissement uniquement (pour faciliter les tests locaux).
  */
 export function verifyShopifyWebhook(
   rawBody: string,
-  signature: string | null
+  signature: string | null,
+  secretOverride?: string
 ): boolean {
   if (!signature) return false;
 
-  const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
+  const secret = secretOverride ?? process.env.SHOPIFY_WEBHOOK_SECRET;
   if (!secret) {
-    console.error("[shopify] SHOPIFY_WEBHOOK_SECRET non configuré");
-    return false;
+    if (isProduction()) {
+      log.error("SHOPIFY_WEBHOOK_SECRET manquant en production — webhook rejeté");
+      return false;
+    }
+    log.warn("SHOPIFY_WEBHOOK_SECRET non configuré (mode dev — webhook accepté)");
+    return true;
   }
 
-  const computedHash = crypto
-    .createHmac("sha256", secret)
-    .update(rawBody, "utf8")
-    .digest("base64");
-
-  // Comparaison en temps constant pour éviter les timing attacks
-  return crypto.timingSafeEqual(
-    Buffer.from(computedHash),
-    Buffer.from(signature)
-  );
+  const expected = hmacSha256Base64(secret, rawBody);
+  return safeCompare(expected, signature);
 }
 
-export function isCashOnDelivery(gateway: string): boolean {
+export function isCashOnDelivery(gateway: string | null | undefined): boolean {
+  if (!gateway) return false;
   const codKeywords = [
     "cash on delivery",
     "cod",
@@ -35,5 +39,6 @@ export function isCashOnDelivery(gateway: string): boolean {
     "livraison",
     "cash",
   ];
-  return codKeywords.some((kw) => gateway.toLowerCase().includes(kw));
+  const g = gateway.toLowerCase();
+  return codKeywords.some((kw) => g.includes(kw));
 }

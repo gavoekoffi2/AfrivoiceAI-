@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { getUserSession } from "@/lib/auth";
-import { getOrganizationStats } from "@/lib/db/queries";
-import { Sidebar } from "@/components/shared/sidebar";
-import { Header } from "@/components/shared/header";
+import { db } from "@/lib/db";
+import { organizations, wallets } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { DashboardShell } from "@/components/shared/dashboard-shell";
 
 export default async function DashboardLayout({
   children,
@@ -10,33 +11,33 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const session = await getUserSession();
+  if (!session) redirect("/login");
 
-  if (!session) {
-    redirect("/login");
-  }
+  // Lecture allégée — uniquement ce dont le shell a besoin
+  const [walletResult, orgResult] = await Promise.all([
+    db
+      .select({ balance: wallets.balanceFcfa })
+      .from(wallets)
+      .where(eq(wallets.organizationId, session.organizationId))
+      .limit(1),
+    db
+      .select({ threshold: organizations.lowBalanceThresholdFcfa })
+      .from(organizations)
+      .where(eq(organizations.id, session.organizationId))
+      .limit(1),
+  ]);
 
-  const stats = await getOrganizationStats(session.organizationId);
+  const walletBalance = parseFloat(walletResult[0]?.balance ?? "0");
+  const lowBalanceThreshold = parseFloat(orgResult[0]?.threshold ?? "5000");
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      {/* Sidebar - masquée sur mobile, visible sur desktop */}
-      <aside className="hidden w-60 shrink-0 border-r border-border md:flex md:flex-col">
-        <Sidebar
-          organizationName={session.organizationName}
-          userEmail={session.email}
-        />
-      </aside>
-
-      {/* Contenu principal */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header
-          title="AfrivoiceAI"
-          walletBalance={stats.walletBalance}
-        />
-        <main className="flex-1 overflow-y-auto">
-          {children}
-        </main>
-      </div>
-    </div>
+    <DashboardShell
+      organizationName={session.organizationName}
+      userEmail={session.email}
+      walletBalance={walletBalance}
+      lowBalanceThreshold={lowBalanceThreshold}
+    >
+      {children}
+    </DashboardShell>
   );
 }

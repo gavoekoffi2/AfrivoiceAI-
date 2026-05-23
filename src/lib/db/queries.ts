@@ -1,6 +1,13 @@
 import { db } from "./index";
-import { calls, orders, campaigns, wallets, transactions } from "./schema";
-import { eq, and, desc, count, sum, sql } from "drizzle-orm";
+import {
+  calls,
+  orders,
+  campaigns,
+  wallets,
+  transactions,
+  leads,
+} from "./schema";
+import { eq, and, desc, count, sql } from "drizzle-orm";
 
 export type OrganizationStats = {
   totalCalls: number;
@@ -20,13 +27,10 @@ export async function getOrganizationStats(
     walletResult,
     activeCampaignsResult,
   ] = await Promise.all([
-    // Total des appels
     db
       .select({ count: count() })
       .from(calls)
       .where(eq(calls.organizationId, organizationId)),
-
-    // Commandes confirmées
     db
       .select({ count: count() })
       .from(orders)
@@ -36,8 +40,6 @@ export async function getOrganizationStats(
           eq(orders.status, "confirmed")
         )
       ),
-
-    // Total des commandes COD (hors pending original)
     db
       .select({ count: count() })
       .from(orders)
@@ -47,15 +49,11 @@ export async function getOrganizationStats(
           sql`status != 'pending'`
         )
       ),
-
-    // Solde du wallet
     db
       .select({ balance: wallets.balanceFcfa })
       .from(wallets)
       .where(eq(wallets.organizationId, organizationId))
       .limit(1),
-
-    // Campagnes actives
     db
       .select({ count: count() })
       .from(campaigns)
@@ -90,20 +88,34 @@ export async function getRecentCalls(
   limit: number = 10
 ) {
   return db
-    .select()
+    .select({
+      id: calls.id,
+      type: calls.type,
+      status: calls.status,
+      outcome: calls.outcome,
+      durationSeconds: calls.durationSeconds,
+      costFcfa: calls.costFcfa,
+      summary: calls.summary,
+      createdAt: calls.createdAt,
+      orderCustomer: orders.customerName,
+      orderPhone: orders.customerPhone,
+      leadName: leads.name,
+      leadPhone: leads.phone,
+    })
     .from(calls)
+    .leftJoin(orders, eq(calls.orderId, orders.id))
+    .leftJoin(leads, eq(calls.leadId, leads.id))
     .where(eq(calls.organizationId, organizationId))
     .orderBy(desc(calls.createdAt))
     .limit(limit);
 }
 
 export async function getCallsChartData(organizationId: string) {
-  // Appels des 7 derniers jours
   const result = await db
     .select({
       date: sql<string>`DATE(${calls.createdAt})`,
       total: count(),
-      completed: sql<number>`COUNT(CASE WHEN ${calls.status} = 'completed' THEN 1 END)`,
+      completed: sql<number>`COUNT(CASE WHEN ${calls.status} = 'completed' THEN 1 END)::int`,
     })
     .from(calls)
     .where(

@@ -6,7 +6,6 @@ import {
   CheckCircle,
   TrendingUp,
   Clock,
-  ArrowRight,
 } from "lucide-react";
 import {
   Card,
@@ -59,7 +58,8 @@ export default async function DashboardOverview() {
       description:
         stats.walletBalance < 5000 ? "Recharge recommandée" : "Solde disponible",
       icon: CreditCard,
-      color: stats.walletBalance < 5000 ? "text-yellow-500" : "text-purple-500",
+      color:
+        stats.walletBalance < 5000 ? "text-yellow-500" : "text-purple-500",
       bgColor:
         stats.walletBalance < 5000
           ? "bg-yellow-50 dark:bg-yellow-950"
@@ -75,7 +75,10 @@ export default async function DashboardOverview() {
     },
   ];
 
-  const statusColors: Record<string, string> = {
+  const statusColors: Record<
+    string,
+    "success" | "destructive" | "warning" | "secondary" | "info"
+  > = {
     completed: "success",
     failed: "destructive",
     "no-answer": "warning",
@@ -86,7 +89,6 @@ export default async function DashboardOverview() {
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-6 lg:p-8">
-      {/* En-tête */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight md:text-3xl">
@@ -98,7 +100,6 @@ export default async function DashboardOverview() {
         </div>
       </div>
 
-      {/* Cartes KPI */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpiCards.map((card) => (
           <Card key={card.title} className="relative overflow-hidden">
@@ -120,9 +121,7 @@ export default async function DashboardOverview() {
         ))}
       </div>
 
-      {/* Graphique + Appels récents */}
       <div className="grid gap-4 lg:grid-cols-3">
-        {/* Graphique des appels */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -152,7 +151,6 @@ export default async function DashboardOverview() {
           </CardContent>
         </Card>
 
-        {/* Appels récents */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -162,44 +160,43 @@ export default async function DashboardOverview() {
           </CardHeader>
           <CardContent className="space-y-3">
             {recentCalls.length > 0 ? (
-              recentCalls.map((call) => (
-                <Link
-                  key={call.id}
-                  href={`/dashboard/calls/${call.id}`}
-                  className="flex items-center justify-between py-1 rounded px-1 hover:bg-accent/50 transition-colors"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 shrink-0">
-                      <PhoneCall className="h-3 w-3 text-primary" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium truncate">
-                        {call.type === "ecommerce_confirmation"
-                          ? "Confirmation"
-                          : "Prospection"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {call.durationSeconds
-                          ? formatDuration(call.durationSeconds)
-                          : "—"}
-                      </p>
-                    </div>
-                  </div>
-                  <Badge
-                    variant={
-                      (statusColors[call.status] as
-                        | "success"
-                        | "destructive"
-                        | "warning"
-                        | "secondary"
-                        | "info") ?? "secondary"
-                    }
-                    className="shrink-0 text-xs"
+              recentCalls.map((call) => {
+                const contact =
+                  call.orderCustomer ??
+                  call.leadName ??
+                  (call.type === "ecommerce_confirmation"
+                    ? "Confirmation"
+                    : "Prospection");
+                return (
+                  <Link
+                    key={call.id}
+                    href={`/dashboard/calls/${call.id}`}
+                    className="flex items-center justify-between py-1 rounded px-1 hover:bg-accent/50 transition-colors"
                   >
-                    {getCallStatusLabel(call.status)}
-                  </Badge>
-                </Link>
-              ))
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 shrink-0">
+                        <PhoneCall className="h-3 w-3 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium truncate">
+                          {contact}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {call.durationSeconds
+                            ? formatDuration(call.durationSeconds)
+                            : "—"}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge
+                      variant={statusColors[call.status] ?? "secondary"}
+                      className="shrink-0 text-xs"
+                    >
+                      {getCallStatusLabel(call.status)}
+                    </Badge>
+                  </Link>
+                );
+              })
             ) : (
               <div className="flex flex-col items-center justify-center py-6 text-center">
                 <PhoneCall className="h-6 w-6 text-muted-foreground/50 mb-2" />

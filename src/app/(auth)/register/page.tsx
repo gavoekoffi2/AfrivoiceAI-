@@ -33,13 +33,14 @@ export default function RegisterPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
       <div className="w-full max-w-md space-y-6">
-        {/* Logo */}
         <div className="flex flex-col items-center space-y-2 text-center">
           <div className="flex items-center justify-center rounded-full bg-primary/10 p-3">
             <PhoneCall className="h-8 w-8 text-primary" />
           </div>
           <h1 className="text-3xl font-bold text-white">AfrivoiceAI</h1>
-          <p className="text-slate-400">Commencez à automatiser vos appels dès aujourd&apos;hui</p>
+          <p className="text-slate-400">
+            Commencez à automatiser vos appels dès aujourd&apos;hui
+          </p>
         </div>
 
         <Card className="border-slate-700 bg-slate-800/50 backdrop-blur">
@@ -72,6 +73,7 @@ export default function RegisterPage() {
                   id="email"
                   name="email"
                   type="email"
+                  autoComplete="email"
                   placeholder="vous@exemple.com"
                   required
                   className="border-slate-600 bg-slate-700 text-white placeholder:text-slate-500"
@@ -85,17 +87,38 @@ export default function RegisterPage() {
                   id="password"
                   name="password"
                   type="password"
-                  placeholder="Au moins 8 caractères"
+                  autoComplete="new-password"
+                  placeholder="8+ caractères, majuscule, chiffre"
                   required
                   minLength={8}
                   className="border-slate-600 bg-slate-700 text-white placeholder:text-slate-500"
                 />
+                <p className="text-xs text-slate-500">
+                  Au moins 8 caractères, avec une majuscule et un chiffre.
+                </p>
               </div>
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isPending}
-              >
+
+              <label className="flex items-start gap-2 text-xs text-slate-400">
+                <input
+                  type="checkbox"
+                  name="acceptTerms"
+                  required
+                  className="mt-0.5 rounded border-slate-600 bg-slate-700"
+                />
+                <span>
+                  J&apos;accepte les{" "}
+                  <Link href="/terms" className="text-primary hover:underline">
+                    CGU
+                  </Link>{" "}
+                  et la{" "}
+                  <Link href="/privacy" className="text-primary hover:underline">
+                    politique de confidentialité
+                  </Link>
+                  .
+                </span>
+              </label>
+
+              <Button type="submit" className="w-full" disabled={isPending}>
                 {isPending ? "Création en cours..." : "Créer mon compte"}
               </Button>
             </form>

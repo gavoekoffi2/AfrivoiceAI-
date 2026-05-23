@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PhoneCall, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ interface ManualCallButtonProps {
 
 export function ManualCallButton({ orderId }: ManualCallButtonProps) {
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   function handleCall() {
     startTransition(async () => {
@@ -34,9 +36,8 @@ export function ManualCallButton({ orderId }: ManualCallButtonProps) {
           return;
         }
 
-        toast.success("Appel lancé ! Vapi va contacter le client dans quelques secondes.");
-        // Rafraîchir pour voir le nouveau statut
-        setTimeout(() => window.location.reload(), 2000);
+        toast.success("Appel lancé. Le client va être contacté.");
+        router.refresh();
       } catch {
         toast.error("Erreur réseau. Veuillez réessayer.");
       }
@@ -51,6 +52,7 @@ export function ManualCallButton({ orderId }: ManualCallButtonProps) {
       onClick={handleCall}
       disabled={isPending}
       title="Relancer un appel"
+      aria-label="Relancer un appel"
     >
       {isPending ? (
         <Loader2 className="h-3 w-3 animate-spin" />

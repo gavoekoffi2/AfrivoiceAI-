@@ -31,26 +31,10 @@ const mainNavItems = [
     href: "/dashboard/e-commerce",
     icon: ShoppingCart,
   },
-  {
-    title: "Campagnes",
-    href: "/dashboard/campaigns",
-    icon: Megaphone,
-  },
-  {
-    title: "Appels",
-    href: "/dashboard/calls",
-    icon: PhoneCall,
-  },
-  {
-    title: "Wallet",
-    href: "/dashboard/wallet",
-    icon: Wallet,
-  },
-  {
-    title: "Paramètres",
-    href: "/dashboard/settings",
-    icon: Settings,
-  },
+  { title: "Campagnes", href: "/dashboard/campaigns", icon: Megaphone },
+  { title: "Appels", href: "/dashboard/calls", icon: PhoneCall },
+  { title: "Wallet", href: "/dashboard/wallet", icon: Wallet },
+  { title: "Paramètres", href: "/dashboard/settings", icon: Settings },
 ];
 
 const comingSoonItems = [
@@ -74,14 +58,18 @@ const comingSoonItems = [
 interface SidebarProps {
   organizationName: string;
   userEmail: string;
+  onNavigate?: () => void;
 }
 
-export function Sidebar({ organizationName, userEmail }: SidebarProps) {
+export function Sidebar({
+  organizationName,
+  userEmail,
+  onNavigate,
+}: SidebarProps) {
   const pathname = usePathname();
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      {/* Header */}
       <div className="flex items-center gap-2 p-4 pb-2">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary">
           <PhoneCall className="h-4 w-4 text-sidebar-primary-foreground" />
@@ -98,8 +86,7 @@ export function Sidebar({ organizationName, userEmail }: SidebarProps) {
 
       <Separator className="bg-sidebar-border mx-2 my-2" />
 
-      {/* Navigation principale */}
-      <nav className="flex-1 space-y-1 px-2 py-2">
+      <nav className="flex-1 space-y-1 px-2 py-2 overflow-y-auto">
         <p className="px-2 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/40 mb-2">
           Navigation
         </p>
@@ -112,6 +99,7 @@ export function Sidebar({ organizationName, userEmail }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                 isActive
@@ -130,7 +118,6 @@ export function Sidebar({ organizationName, userEmail }: SidebarProps) {
 
         <Separator className="bg-sidebar-border my-3" />
 
-        {/* Coming Soon */}
         <p className="px-2 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/40 mb-2">
           Bientôt disponible
         </p>
@@ -144,14 +131,16 @@ export function Sidebar({ organizationName, userEmail }: SidebarProps) {
               <span className="truncate">{item.title}</span>
               <span className="text-xs truncate">{item.description}</span>
             </div>
-            <Badge variant="comingSoon" className="ml-auto shrink-0 text-xs px-1.5">
+            <Badge
+              variant="comingSoon"
+              className="ml-auto shrink-0 text-xs px-1.5"
+            >
               Bientôt
             </Badge>
           </div>
         ))}
       </nav>
 
-      {/* Footer - User */}
       <Separator className="bg-sidebar-border mx-2" />
       <div className="p-2">
         <div className="flex items-center gap-3 rounded-lg px-3 py-2">
@@ -168,6 +157,7 @@ export function Sidebar({ organizationName, userEmail }: SidebarProps) {
               type="submit"
               className="text-sidebar-foreground/40 hover:text-sidebar-foreground transition-colors"
               title="Se déconnecter"
+              aria-label="Se déconnecter"
             >
               <LogOut className="h-4 w-4" />
             </button>

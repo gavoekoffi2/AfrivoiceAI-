@@ -35,5 +35,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# drizzle
-/src/supabase/migrations/*.sql
+# drizzle generated artifacts (les SQL versionnés sont commit, les meta non)
+/src/supabase/migrations/meta/
+*.snapshot.json

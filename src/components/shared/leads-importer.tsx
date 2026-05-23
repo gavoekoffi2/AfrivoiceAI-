@@ -6,9 +6,11 @@ import { Upload, FileText, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { importLeadsFromCsvAction } from "@/app/actions/campaigns";
 import { normalizePhoneNumber } from "@/lib/utils";
+import { csvToRecords } from "@/lib/utils/csv";
 
 interface LeadsImporterProps {
   campaignId: string;
+  onImported?: () => void;
 }
 
 interface ParsedLead {
@@ -18,88 +20,109 @@ interface ParsedLead {
   email?: string;
 }
 
-export function LeadsImporter({ campaignId }: LeadsImporterProps) {
+const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_LEADS = 5000;
+
+function extractLeads(content: string): ParsedLead[] {
+  const records = csvToRecords(content);
+  const leads: ParsedLead[] = [];
+  for (const row of records) {
+    const phoneRaw =
+      row.telephone ||
+      row["téléphone"] ||
+      row.phone ||
+      row.tel ||
+      row.mobile ||
+      row["numéro"] ||
+      row.numero ||
+      "";
+    if (!phoneRaw) continue;
+
+    const normalized = normalizePhoneNumber(phoneRaw, "TG") ?? phoneRaw;
+
+    leads.push({
+      name:
+        row.nom ||
+        row.name ||
+        row["prénom"] ||
+        row.prenom ||
+        row["full_name"] ||
+        undefined,
+      phone: normalized,
+      company:
+        row.entreprise ||
+        row.company ||
+        row["société"] ||
+        row.societe ||
+        undefined,
+      email: row.email || row.mail || undefined,
+    });
+
+    if (leads.length >= MAX_LEADS) break;
+  }
+  return leads;
+}
+
+export function LeadsImporter({ campaignId, onImported }: LeadsImporterProps) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ParsedLead[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  function parseCsv(content: string): ParsedLead[] {
-    const lines = content.trim().split("\n");
-    if (lines.length < 2) return [];
-
-    const headers = lines[0]
-      .split(",")
-      .map((h) => h.trim().toLowerCase().replace(/['"]/g, ""));
-
-    return lines
-      .slice(1)
-      .map((line) => {
-        const values = line.split(",").map((v) => v.trim().replace(/['"]/g, ""));
-        const row: Record<string, string> = {};
-        headers.forEach((h, i) => {
-          row[h] = values[i] ?? "";
-        });
-
-        const phone =
-          row.telephone ||
-          row.phone ||
-          row.tel ||
-          row.mobile ||
-          row.numéro ||
-          "";
-
-        const normalizedPhone = normalizePhoneNumber(phone, "TG") ?? phone;
-
-        return {
-          name: row.nom || row.name || row.prénom || undefined,
-          phone: normalizedPhone,
-          company: row.entreprise || row.company || row.société || undefined,
-          email: row.email || row.mail || undefined,
-        };
-      })
-      .filter((lead) => lead.phone.length >= 8);
+  function readFileAsText(f: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(String(e.target?.result ?? ""));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(f, "utf-8");
+    });
   }
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
-    if (!selectedFile.name.endsWith(".csv")) {
+    if (
+      !selectedFile.name.toLowerCase().endsWith(".csv") &&
+      selectedFile.type !== "text/csv"
+    ) {
       toast.error("Seuls les fichiers CSV sont acceptés.");
       return;
     }
 
-    setFile(selectedFile);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      const parsed = parseCsv(content);
-      setPreview(parsed.slice(0, 5));
+    if (selectedFile.size > MAX_BYTES) {
+      toast.error("Fichier trop volumineux (5 MB max).");
+      return;
+    }
+
+    try {
+      const content = await readFileAsText(selectedFile);
+      const parsed = extractLeads(content);
 
       if (parsed.length === 0) {
-        toast.error(
-          "Aucun lead valide trouvé. Vérifiez le format du fichier CSV."
-        );
-        setFile(null);
-      } else {
-        toast.success(
-          `${parsed.length} lead(s) détecté(s). Prêt à importer.`
-        );
+        toast.error("Aucun lead valide trouvé. Vérifiez le format du CSV.");
+        return;
       }
-    };
-    reader.readAsText(selectedFile);
+
+      setFile(selectedFile);
+      setPreview(parsed.slice(0, 5));
+      setTotalCount(parsed.length);
+      toast.success(`${parsed.length} lead(s) détecté(s). Prêt à importer.`);
+    } catch (err) {
+      toast.error("Erreur de lecture du fichier.");
+      console.error(err);
+    }
   }
 
   function handleImport() {
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      const leads = parseCsv(content);
+    startTransition(async () => {
+      try {
+        const content = await readFileAsText(file);
+        const leads = extractLeads(content);
 
-      startTransition(async () => {
         const result = await importLeadsFromCsvAction(campaignId, leads);
 
         if (result.error) {
@@ -110,15 +133,25 @@ export function LeadsImporter({ campaignId }: LeadsImporterProps) {
         toast.success(`${result.count} lead(s) importés avec succès !`);
         setFile(null);
         setPreview([]);
+        setTotalCount(0);
         if (fileInputRef.current) fileInputRef.current.value = "";
-      });
-    };
-    reader.readAsText(file);
+        onImported?.();
+      } catch (err) {
+        toast.error("Erreur lors de l'import.");
+        console.error(err);
+      }
+    });
+  }
+
+  function clearFile() {
+    setFile(null);
+    setPreview([]);
+    setTotalCount(0);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   return (
     <div className="space-y-3">
-      {/* Zone de dépôt */}
       <div
         onClick={() => fileInputRef.current?.click()}
         className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 p-6 hover:border-primary/50 hover:bg-accent/50 transition-colors"
@@ -126,48 +159,44 @@ export function LeadsImporter({ campaignId }: LeadsImporterProps) {
         <Upload className="h-8 w-8 text-muted-foreground/50 mb-2" />
         <p className="text-sm font-medium">Cliquez pour sélectionner un CSV</p>
         <p className="text-xs text-muted-foreground mt-1">
-          Colonnes attendues : nom, téléphone, entreprise
+          Colonnes attendues : nom, téléphone (requis), entreprise, email
         </p>
         <input
           ref={fileInputRef}
           type="file"
-          accept=".csv"
+          accept=".csv,text/csv"
           className="hidden"
           onChange={handleFileChange}
         />
       </div>
 
-      {/* Fichier sélectionné */}
       {file && (
         <div className="flex items-center justify-between rounded-md border p-3">
-          <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-primary" />
+          <div className="flex items-center gap-2 min-w-0">
+            <FileText className="h-4 w-4 text-primary shrink-0" />
             <span className="text-sm font-medium truncate max-w-[200px]">
               {file.name}
             </span>
-            <span className="text-xs text-muted-foreground">
-              ({preview.length > 0 ? `~${preview.length}+ leads` : "0 leads"})
+            <span className="text-xs text-muted-foreground shrink-0">
+              {totalCount} lead{totalCount > 1 ? "s" : ""}
             </span>
           </div>
           <Button
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            onClick={() => {
-              setFile(null);
-              setPreview([]);
-            }}
+            onClick={clearFile}
+            aria-label="Retirer le fichier"
           >
             <X className="h-3 w-3" />
           </Button>
         </div>
       )}
 
-      {/* Aperçu */}
       {preview.length > 0 && (
         <div className="rounded-md border p-3 space-y-1">
           <p className="text-xs font-medium text-muted-foreground mb-2">
-            Aperçu (5 premiers leads) :
+            Aperçu :
           </p>
           {preview.map((lead, i) => (
             <div key={i} className="text-xs text-muted-foreground">
@@ -178,7 +207,6 @@ export function LeadsImporter({ campaignId }: LeadsImporterProps) {
         </div>
       )}
 
-      {/* Bouton d'import */}
       {file && (
         <Button
           onClick={handleImport}
@@ -186,7 +214,7 @@ export function LeadsImporter({ campaignId }: LeadsImporterProps) {
           className="w-full gap-2"
         >
           {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-          Importer les leads
+          Importer {totalCount} lead{totalCount > 1 ? "s" : ""}
         </Button>
       )}
     </div>

@@ -1,6 +1,18 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const PUBLIC_PATHS = [
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/auth/callback",
+  "/terms",
+  "/privacy",
+];
+
+const AUTH_PATHS = new Set(["/login", "/register", "/forgot-password"]);
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request: {
@@ -40,26 +52,34 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  // Protection des routes Dashboard
-  if (pathname.startsWith("/dashboard") && !user) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  // Webhooks publics — pas d'auth
+  if (pathname.startsWith("/api/webhooks/") || pathname === "/api/health") {
+    return supabaseResponse;
   }
 
-  // Protection des routes API (sauf webhooks)
-  if (
-    pathname.startsWith("/api/") &&
-    !pathname.startsWith("/api/webhooks/") &&
-    !user
-  ) {
+  // Auth callback Supabase
+  if (pathname.startsWith("/auth/")) {
+    return supabaseResponse;
+  }
+
+  // Dashboard : protégé
+  if (pathname.startsWith("/dashboard") && !user) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirectTo", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // API : protégée sauf publiques
+  if (pathname.startsWith("/api/") && !user) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 
-  // Redirection des utilisateurs connectés loin des pages d'auth
-  if ((pathname === "/login" || pathname === "/register") && user) {
+  // Redirection si déjà connecté
+  if (user && AUTH_PATHS.has(pathname)) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // Redirection depuis la racine
+  // Racine
   if (pathname === "/") {
     return NextResponse.redirect(
       new URL(user ? "/dashboard" : "/login", request.url)
@@ -71,6 +91,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

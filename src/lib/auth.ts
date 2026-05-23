@@ -1,7 +1,12 @@
-import { createSupabaseServerClient } from "./supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceClient } from "./supabase/server";
 import { db } from "./db";
-import { users, organizations } from "./db/schema";
+import { users, organizations, wallets } from "./db/schema";
 import { eq } from "drizzle-orm";
+import { safeCompare } from "./utils/hmac";
+import { generateSlug } from "./utils";
+import { createLogger } from "./utils/logger";
+
+const log = createLogger("auth");
 
 export type UserSession = {
   id: string;
@@ -11,6 +16,12 @@ export type UserSession = {
   organizationName: string;
 };
 
+/**
+ * Récupère la session utilisateur depuis Supabase puis la mappe sur la DB.
+ * Si la ligne `users` n'existe pas encore (cas où le trigger Supabase n'a pas
+ * encore tourné — déploiement local Postgres ou nouvelle migration), on
+ * provisionne automatiquement organization + user + wallet.
+ */
 export async function getUserSession(): Promise<UserSession | null> {
   try {
     const supabase = createSupabaseServerClient();
@@ -34,9 +45,18 @@ export async function getUserSession(): Promise<UserSession | null> {
       .where(eq(users.id, authUser.id))
       .limit(1);
 
-    return result[0] ?? null;
-  } catch (error) {
-    console.error("[auth] Erreur lors de la récupération de session:", error);
+    if (result[0]) return result[0];
+
+    // Fallback : trigger absent → on provisionne nous-mêmes
+    return await provisionUser({
+      authUserId: authUser.id,
+      email: authUser.email ?? "",
+      organizationName:
+        (authUser.user_metadata?.organization_name as string | undefined) ??
+        (authUser.email ? authUser.email.split("@")[0] : "Mon Organisation"),
+    });
+  } catch (err) {
+    log.error("Erreur récupération session", { error: String(err) });
     return null;
   }
 }
@@ -44,16 +64,126 @@ export async function getUserSession(): Promise<UserSession | null> {
 export async function requireSession(): Promise<UserSession> {
   const session = await getUserSession();
   if (!session) {
-    throw new Error("Non autorisé - Session requise");
+    throw new Error("Non autorisé — session requise");
   }
   return session;
 }
 
-// Pour les API Routes (Request object)
-export async function checkAuthFromRequest(req: Request): Promise<UserSession | null> {
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader) return null;
-
-  // Utiliser le cookie de session depuis les headers
-  return getUserSession();
+/**
+ * Vérifie un appel interne (server-to-server) via le secret partagé
+ * INTERNAL_API_SECRET. Ne JAMAIS utiliser la service-role Supabase pour ça.
+ */
+export function isAuthorizedInternalCall(req: Request): boolean {
+  const secret = process.env.INTERNAL_API_SECRET;
+  if (!secret) return false;
+  const provided = req.headers.get("x-internal-secret");
+  if (!provided) return false;
+  return safeCompare(secret, provided);
 }
+
+/**
+ * Provisionne organization + user + wallet pour un utilisateur Supabase
+ * qui vient de s'inscrire (utile si les triggers SQL n'ont pas pu s'exécuter).
+ *
+ * Idempotent : si l'utilisateur existe déjà, retourne la session existante.
+ */
+export async function provisionUser(params: {
+  authUserId: string;
+  email: string;
+  organizationName: string;
+}): Promise<UserSession | null> {
+  const { authUserId, email, organizationName } = params;
+
+  // Re-check pour éviter une race condition
+  const existing = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      role: users.role,
+      organizationId: users.organizationId,
+      organizationName: organizations.name,
+    })
+    .from(users)
+    .innerJoin(organizations, eq(users.organizationId, organizations.id))
+    .where(eq(users.id, authUserId))
+    .limit(1);
+
+  if (existing[0]) return existing[0];
+
+  try {
+    const session = await db.transaction(async (tx) => {
+      // Slug unique
+      const baseSlug = generateSlug(organizationName) || "org";
+      let slug = baseSlug;
+      let attempt = 0;
+      while (
+        await tx
+          .select({ id: organizations.id })
+          .from(organizations)
+          .where(eq(organizations.slug, slug))
+          .limit(1)
+          .then((r) => r.length > 0)
+      ) {
+        attempt++;
+        slug = `${baseSlug}-${attempt}`;
+        if (attempt > 100) {
+          slug = `${baseSlug}-${Math.random().toString(36).slice(2, 10)}`;
+          break;
+        }
+      }
+
+      const webhookToken =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "")
+          : Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+      const [org] = await tx
+        .insert(organizations)
+        .values({
+          name: organizationName,
+          slug,
+          webhookToken,
+        })
+        .returning();
+
+      await tx.insert(users).values({
+        id: authUserId,
+        organizationId: org.id,
+        email,
+        role: "owner",
+      });
+
+      await tx.insert(wallets).values({
+        organizationId: org.id,
+        balanceFcfa: "0",
+      });
+
+      return {
+        id: authUserId,
+        email,
+        role: "owner",
+        organizationId: org.id,
+        organizationName: org.name,
+      };
+    });
+
+    log.info("Utilisateur provisionné", {
+      userId: authUserId,
+      orgId: session.organizationId,
+    });
+
+    return session;
+  } catch (err) {
+    log.error("Échec provisionUser", { error: String(err), userId: authUserId });
+    return null;
+  }
+}
+
+/**
+ * Met à jour l'email côté DB après changement Supabase Auth.
+ */
+export async function syncUserEmail(authUserId: string, newEmail: string) {
+  await db.update(users).set({ email: newEmail }).where(eq(users.id, authUserId));
+}
+
+export { createSupabaseServerClient, createSupabaseServiceClient };

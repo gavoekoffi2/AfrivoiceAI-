@@ -1,183 +1,176 @@
 import { NextResponse } from "next/server";
-import crypto from "crypto";
 import { db } from "@/lib/db";
-import { orders, organizations } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { orders } from "@/lib/db/schema";
 import { normalizePhoneNumber } from "@/lib/utils";
+import {
+  verifyWooCommerceWebhook,
+  isWooCommerceCOD,
+} from "@/lib/woocommerce/verify";
+import { woocommerceOrderSchema } from "@/lib/validations/webhooks";
+import { recordWebhookEvent } from "@/lib/webhooks/idempotency";
+import { resolveOrganizationForWooCommerce } from "@/lib/organizations/resolver";
+import { triggerCall } from "@/lib/calls/trigger";
+import { rateLimit, getClientIp } from "@/lib/utils/rate-limit";
+import { createLogger } from "@/lib/utils/logger";
 
-interface WooCommerceOrderPayload {
-  id: number;
-  status: string;
-  total: string;
-  currency: string;
-  payment_method: string;
-  payment_method_title: string;
-  billing: {
-    first_name?: string;
-    last_name?: string;
-    phone?: string;
-    address_1?: string;
-    city?: string;
-    country?: string;
-  };
-  shipping: {
-    first_name?: string;
-    last_name?: string;
-    phone?: string;
-    address_1?: string;
-    city?: string;
-    country?: string;
-  };
-  meta_data?: Array<{ key: string; value: string }>;
-}
-
-function verifyWooCommerceWebhook(
-  rawBody: string,
-  signature: string | null
-): boolean {
-  if (!signature) return false;
-
-  const secret = process.env.WOOCOMMERCE_WEBHOOK_SECRET;
-  if (!secret) return true; // Pas de secret configuré, accepter en dev
-
-  const computedHash = crypto
-    .createHmac("sha256", secret)
-    .update(rawBody, "utf8")
-    .digest("base64");
-
-  try {
-    return crypto.timingSafeEqual(
-      Buffer.from(computedHash),
-      Buffer.from(signature)
-    );
-  } catch {
-    return false;
-  }
-}
-
-function isWooCommerceCOD(paymentMethod: string): boolean {
-  const codMethods = ["cod", "cash_on_delivery", "paiement_livraison"];
-  return codMethods.some((m) =>
-    paymentMethod.toLowerCase().includes(m.toLowerCase())
-  );
-}
+const log = createLogger("woocommerce/webhook");
 
 export async function POST(req: Request) {
+  const ip = getClientIp(req);
+  const rl = rateLimit(`woocommerce:${ip}`, 100, 60_000);
+  if (!rl.success) {
+    return NextResponse.json({ error: "Trop de requêtes" }, { status: 429 });
+  }
+
+  let rawBody: string;
   try {
-    const rawBody = await req.text();
-    const signature = req.headers.get("x-wc-webhook-signature");
-    const topic = req.headers.get("x-wc-webhook-topic");
+    rawBody = await req.text();
+  } catch {
+    return NextResponse.json({ error: "Body invalide" }, { status: 400 });
+  }
 
-    if (!verifyWooCommerceWebhook(rawBody, signature)) {
-      console.warn("[woocommerce/webhook] Signature invalide");
-      return NextResponse.json({ error: "Signature invalide" }, { status: 401 });
-    }
+  const signature = req.headers.get("x-wc-webhook-signature");
+  const topic = req.headers.get("x-wc-webhook-topic");
+  const sourceDomain = req.headers.get("x-wc-webhook-source");
+  const eventId =
+    req.headers.get("x-wc-webhook-id") ??
+    `${sourceDomain ?? "woo"}:${Date.now()}`;
+  const url = new URL(req.url);
 
-    // Ne traiter que les créations de commande
-    if (topic !== "order.created") {
-      return NextResponse.json({ received: true });
-    }
+  if (!verifyWooCommerceWebhook(rawBody, signature)) {
+    log.warn("Signature invalide");
+    return NextResponse.json({ error: "Signature invalide" }, { status: 401 });
+  }
 
-    const payload: WooCommerceOrderPayload = JSON.parse(rawBody);
+  if (topic && topic !== "order.created") {
+    return NextResponse.json({ received: true, action: "ignored_topic" });
+  }
 
-    // Vérifier si c'est une commande COD
-    if (!isWooCommerceCOD(payload.payment_method)) {
-      return NextResponse.json({
-        received: true,
-        action: "ignored_non_cod",
-        payment_method: payload.payment_method,
-      });
-    }
+  let payload;
+  try {
+    payload = woocommerceOrderSchema.parse(JSON.parse(rawBody));
+  } catch (err) {
+    log.warn("Payload invalide", { error: String(err) });
+    return NextResponse.json({ error: "Payload invalide" }, { status: 422 });
+  }
 
-    // Chercher l'organisation (en production, associer via le domaine WooCommerce)
-    const orgResult = await db.select().from(organizations).limit(1);
-    const organization = orgResult[0];
+  const sourceHost = sourceDomain
+    ? (() => {
+        try {
+          return new URL(sourceDomain).hostname;
+        } catch {
+          return sourceDomain;
+        }
+      })()
+    : null;
 
-    if (!organization) {
-      return NextResponse.json(
-        { error: "Organisation introuvable" },
-        { status: 404 }
-      );
-    }
+  const organization = await resolveOrganizationForWooCommerce(url, sourceHost);
+  if (!organization) {
+    log.warn("Aucune organisation associée", { sourceHost });
+    return NextResponse.json(
+      {
+        error:
+          "Organisation introuvable. Configurez votre webhook avec ?token=… ou enregistrez le domaine de votre boutique.",
+      },
+      { status: 404 }
+    );
+  }
 
-    // Extraire les données client (billing > shipping)
-    const firstName =
-      payload.shipping?.first_name ||
-      payload.billing?.first_name ||
-      "";
-    const lastName =
-      payload.shipping?.last_name || payload.billing?.last_name || "";
-    const customerName = `${firstName} ${lastName}`.trim() || "Client";
+  const { isNew } = await recordWebhookEvent({
+    source: "woocommerce",
+    externalEventId: eventId,
+    organizationId: organization.id,
+    payload,
+  });
+  if (!isNew) {
+    return NextResponse.json({ received: true, duplicate: true });
+  }
 
-    const rawPhone =
-      payload.billing?.phone || payload.shipping?.phone || "";
+  if (!isWooCommerceCOD(payload.payment_method)) {
+    return NextResponse.json({
+      received: true,
+      action: "ignored_non_cod",
+    });
+  }
 
-    if (!rawPhone) {
-      return NextResponse.json(
-        { error: "Numéro de téléphone manquant" },
-        { status: 422 }
-      );
-    }
+  const firstName =
+    payload.shipping?.first_name || payload.billing?.first_name || "";
+  const lastName =
+    payload.shipping?.last_name || payload.billing?.last_name || "";
+  const customerName = `${firstName} ${lastName}`.trim() || "Client";
 
-    const normalizedPhone = normalizePhoneNumber(rawPhone, "TG");
-    if (!normalizedPhone) {
-      return NextResponse.json(
-        { error: "Numéro de téléphone invalide" },
-        { status: 422 }
-      );
-    }
+  const rawPhone = payload.billing?.phone || payload.shipping?.phone || "";
+  if (!rawPhone) {
+    return NextResponse.json(
+      { error: "Numéro de téléphone manquant" },
+      { status: 422 }
+    );
+  }
 
-    const address = [
+  const normalizedPhone = normalizePhoneNumber(rawPhone, "TG");
+  if (!normalizedPhone) {
+    return NextResponse.json(
+      { error: "Numéro de téléphone invalide" },
+      { status: 422 }
+    );
+  }
+
+  const address =
+    [
       payload.shipping?.address_1 || payload.billing?.address_1,
       payload.shipping?.city || payload.billing?.city,
       payload.shipping?.country || payload.billing?.country,
     ]
       .filter(Boolean)
-      .join(", ");
+      .join(", ") || null;
 
-    const insertedOrder = await db
+  let insertedOrder;
+  try {
+    [insertedOrder] = await db
       .insert(orders)
       .values({
         organizationId: organization.id,
-        externalId: payload.id.toString(),
+        externalId: payload.id,
         source: "woocommerce",
         customerName,
         customerPhone: normalizedPhone,
-        customerAddress: address || null,
-        totalAmount: payload.total,
+        customerAddress: address,
+        totalAmount: payload.total ?? null,
         currency: payload.currency || "XOF",
         status: "pending",
-        rawPayload: payload as Record<string, unknown>,
+        rawPayload: payload as never,
+      })
+      .onConflictDoNothing({
+        target: [orders.organizationId, orders.source, orders.externalId],
       })
       .returning();
-
-    console.log(
-      `[woocommerce/webhook] Commande COD créée: ${insertedOrder[0].id} pour ${customerName}`
-    );
-
-    // Déclencher l'appel de confirmation
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-    fetch(`${baseUrl}/api/calls/initiate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-internal-secret": process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
-      },
-      body: JSON.stringify({ orderId: insertedOrder[0].id }),
-    }).catch((err) => {
-      console.error(
-        `[woocommerce/webhook] Erreur déclenchement appel:`,
-        err
-      );
-    });
-
-    return NextResponse.json({
-      received: true,
-      orderId: insertedOrder[0].id,
-      action: "call_initiated",
-    });
-  } catch (error) {
-    console.error("[woocommerce/webhook] Erreur:", error);
+  } catch (err) {
+    log.error("Insertion commande échouée", { error: String(err) });
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
+
+  if (!insertedOrder) {
+    return NextResponse.json({ received: true, duplicate: true });
+  }
+
+  log.info("Commande COD créée", {
+    orderId: insertedOrder.id,
+    organizationId: organization.id,
+  });
+
+  triggerCall({
+    organizationId: organization.id,
+    orderId: insertedOrder.id,
+  }).catch((err) =>
+    log.error("Échec déclenchement appel", {
+      error: String(err),
+      orderId: insertedOrder!.id,
+    })
+  );
+
+  return NextResponse.json({
+    received: true,
+    orderId: insertedOrder.id,
+    action: "order_created",
+  });
 }

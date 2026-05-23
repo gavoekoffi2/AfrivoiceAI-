@@ -27,6 +27,7 @@ import {
 import { formatFcfa, formatDuration, getCallStatusLabel } from "@/lib/utils";
 import { LeadsImporter } from "@/components/shared/leads-importer";
 import { CampaignBatchCaller } from "@/components/shared/campaign-batch-caller";
+import { EditCampaignDialog } from "@/components/shared/edit-campaign-dialog";
 
 export default async function CampaignDetailPage({
   params,
@@ -165,11 +166,19 @@ export default async function CampaignDetailPage({
           </div>
           <p className="text-muted-foreground mt-1">{campaign.objective}</p>
         </div>
-        <CampaignBatchCaller
-          campaignId={campaign.id}
-          status={campaign.status}
-          pendingLeads={newLeads}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <EditCampaignDialog
+            campaignId={campaign.id}
+            initialName={campaign.name}
+            initialObjective={campaign.objective}
+            initialScriptTemplate={campaign.scriptTemplate}
+          />
+          <CampaignBatchCaller
+            campaignId={campaign.id}
+            status={campaign.status}
+            pendingLeads={newLeads}
+          />
+        </div>
       </div>
 
       {/* Progression */}

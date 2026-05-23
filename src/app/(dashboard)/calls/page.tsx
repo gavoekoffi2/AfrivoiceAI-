@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getUserSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { calls } from "@/lib/db/schema";
+import { calls, orders, leads } from "@/lib/db/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 import {
   Card,
@@ -20,6 +20,7 @@ import {
   Clock,
   TrendingUp,
   Filter,
+  Download,
 } from "lucide-react";
 import { formatFcfa, formatDuration, getCallStatusLabel } from "@/lib/utils";
 import { CallsFilter } from "@/components/shared/calls-filter";
@@ -58,72 +59,97 @@ export default async function CallsPage({
   const limit = 20;
   const offset = (page - 1) * limit;
 
-  // Filtres valides uniquement
   const typeFilter =
-    searchParams.type && VALID_TYPES.includes(searchParams.type as typeof VALID_TYPES[number])
+    searchParams.type &&
+    VALID_TYPES.includes(searchParams.type as (typeof VALID_TYPES)[number])
       ? searchParams.type
       : undefined;
   const statusFilter =
-    searchParams.status && VALID_STATUSES.includes(searchParams.status as typeof VALID_STATUSES[number])
+    searchParams.status &&
+    VALID_STATUSES.includes(
+      searchParams.status as (typeof VALID_STATUSES)[number]
+    )
       ? searchParams.status
       : undefined;
 
-  // Conditions dynamiques
   const conditions = [eq(calls.organizationId, session.organizationId)];
   if (typeFilter) conditions.push(eq(calls.type, typeFilter));
   if (statusFilter) conditions.push(eq(calls.status, statusFilter));
 
   const whereClause = and(...conditions);
 
-  const [allCalls, totalCountResult, statsResult] = await Promise.all([
-    db
-      .select()
-      .from(calls)
-      .where(whereClause)
-      .orderBy(desc(calls.createdAt))
-      .limit(limit)
-      .offset(offset),
-    db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(calls)
-      .where(whereClause),
-    // Stats globales de l'organisation (pas affectées par les filtres)
-    db
-      .select({
-        total: sql<number>`count(*)::int`,
-        completed: sql<number>`count(*) filter (where status = 'completed')::int`,
-        ecommerceCount: sql<number>`count(*) filter (where type = 'ecommerce_confirmation')::int`,
-        prospectingCount: sql<number>`count(*) filter (where type = 'prospecting')::int`,
-      })
-      .from(calls)
-      .where(eq(calls.organizationId, session.organizationId)),
-  ]);
+  const [allCalls, totalCountResult, statsResult, totalCostResult] =
+    await Promise.all([
+      db
+        .select({
+          id: calls.id,
+          type: calls.type,
+          status: calls.status,
+          outcome: calls.outcome,
+          durationSeconds: calls.durationSeconds,
+          costFcfa: calls.costFcfa,
+          summary: calls.summary,
+          createdAt: calls.createdAt,
+          orderCustomer: orders.customerName,
+          orderPhone: orders.customerPhone,
+          leadName: leads.name,
+          leadPhone: leads.phone,
+        })
+        .from(calls)
+        .leftJoin(orders, eq(calls.orderId, orders.id))
+        .leftJoin(leads, eq(calls.leadId, leads.id))
+        .where(whereClause)
+        .orderBy(desc(calls.createdAt))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(calls)
+        .where(whereClause),
+      db
+        .select({
+          total: sql<number>`count(*)::int`,
+          completed: sql<number>`count(*) filter (where status = 'completed')::int`,
+          ecommerceCount: sql<number>`count(*) filter (where type = 'ecommerce_confirmation')::int`,
+          prospectingCount: sql<number>`count(*) filter (where type = 'prospecting')::int`,
+        })
+        .from(calls)
+        .where(eq(calls.organizationId, session.organizationId)),
+      // Coût total avec les filtres en cours (pas juste la page actuelle)
+      db
+        .select({
+          sum: sql<string>`COALESCE(SUM(cost_fcfa), 0)::text`,
+        })
+        .from(calls)
+        .where(whereClause),
+    ]);
 
   const totalCount = totalCountResult[0]?.count ?? 0;
   const totalPages = Math.ceil(totalCount / limit);
   const stats = statsResult[0];
-
-  // Coût total des appels filtrés (actuellement affichés)
-  const filteredCostFcfa = allCalls.reduce(
-    (sum, c) => sum + (c.costFcfa ? parseFloat(c.costFcfa) : 0),
-    0
-  );
+  const totalFilteredCostFcfa = parseFloat(totalCostResult[0]?.sum ?? "0");
 
   const hasFilters = Boolean(typeFilter || statusFilter);
 
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
-      {/* En-tête */}
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">
-          Historique des appels
-        </h2>
-        <p className="text-muted-foreground">
-          Tous les appels passés via AfrivoiceAI — e-commerce et prospection
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">
+            Historique des appels
+          </h2>
+          <p className="text-muted-foreground">
+            Tous les appels passés via AfrivoiceAI — e-commerce et prospection
+          </p>
+        </div>
+        <Button asChild variant="outline" size="sm" className="gap-2">
+          <a href="/api/calls/export" download>
+            <Download className="h-4 w-4" />
+            Exporter en CSV
+          </a>
+        </Button>
       </div>
 
-      {/* Statistiques globales */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           {
@@ -167,7 +193,6 @@ export default async function CallsPage({
         ))}
       </div>
 
-      {/* Filtres */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -176,24 +201,20 @@ export default async function CallsPage({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <CallsFilter
-            currentType={typeFilter}
-            currentStatus={statusFilter}
-          />
+          <CallsFilter currentType={typeFilter} currentStatus={statusFilter} />
         </CardContent>
       </Card>
 
-      {/* Liste des appels */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <PhoneCall className="h-5 w-5 text-primary" />
             Appels ({totalCount.toLocaleString("fr-TG")})
           </CardTitle>
-          {filteredCostFcfa > 0 && (
+          {totalFilteredCostFcfa > 0 && (
             <CardDescription>
-              Coût total {hasFilters ? "(filtre actif)" : ""} :{" "}
-              {formatFcfa(filteredCostFcfa)}
+              Coût total {hasFilters ? "(filtres actifs)" : ""} :{" "}
+              {formatFcfa(totalFilteredCostFcfa)}
             </CardDescription>
           )}
         </CardHeader>
@@ -215,78 +236,85 @@ export default async function CallsPage({
             </div>
           ) : (
             <div className="space-y-2">
-              {allCalls.map((call) => (
-                <Link
-                  key={call.id}
-                  href={`/dashboard/calls/${call.id}`}
-                  className="flex items-center justify-between rounded-lg border p-3 hover:bg-accent/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                      {call.type === "ecommerce_confirmation" ? (
-                        <ShoppingCart className="h-4 w-4 text-primary" />
-                      ) : (
-                        <Users className="h-4 w-4 text-primary" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-medium truncate">
-                          {call.summary ??
-                            (call.type === "ecommerce_confirmation"
-                              ? "Confirmation de commande"
-                              : "Appel de prospection")}
-                        </p>
-                        <Badge
-                          variant="outline"
-                          className="hidden sm:flex text-xs shrink-0"
-                        >
-                          {call.type === "ecommerce_confirmation"
-                            ? "E-commerce"
-                            : "Prospection"}
-                        </Badge>
+              {allCalls.map((call) => {
+                const contactName =
+                  call.orderCustomer ?? call.leadName ?? "—";
+                const contactPhone = call.orderPhone ?? call.leadPhone ?? "";
+                return (
+                  <Link
+                    key={call.id}
+                    href={`/dashboard/calls/${call.id}`}
+                    className="flex items-center justify-between rounded-lg border p-3 hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                        {call.type === "ecommerce_confirmation" ? (
+                          <ShoppingCart className="h-4 w-4 text-primary" />
+                        ) : (
+                          <Users className="h-4 w-4 text-primary" />
+                        )}
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                        <Clock className="h-3 w-3" />
-                        <span>
-                          {call.durationSeconds
-                            ? formatDuration(call.durationSeconds)
-                            : "—"}
-                        </span>
-                        <span>·</span>
-                        <span>
-                          {new Date(call.createdAt).toLocaleDateString(
-                            "fr-TG",
-                            {
-                              day: "numeric",
-                              month: "short",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            }
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-medium truncate">
+                            {contactName}
+                          </p>
+                          <Badge
+                            variant="outline"
+                            className="hidden sm:flex text-xs shrink-0"
+                          >
+                            {call.type === "ecommerce_confirmation"
+                              ? "E-commerce"
+                              : "Prospection"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
+                          {contactPhone && (
+                            <>
+                              <span>{contactPhone}</span>
+                              <span>·</span>
+                            </>
                           )}
-                        </span>
+                          <Clock className="h-3 w-3" />
+                          <span>
+                            {call.durationSeconds
+                              ? formatDuration(call.durationSeconds)
+                              : "—"}
+                          </span>
+                          <span>·</span>
+                          <span>
+                            {new Date(call.createdAt).toLocaleDateString(
+                              "fr-TG",
+                              {
+                                day: "numeric",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              }
+                            )}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0 ml-2">
-                    {call.costFcfa && parseFloat(call.costFcfa) > 0 && (
-                      <span className="text-xs text-muted-foreground hidden md:block">
-                        {formatFcfa(parseFloat(call.costFcfa))}
-                      </span>
-                    )}
-                    <Badge
-                      variant={callStatusColors[call.status] ?? "secondary"}
-                      className="text-xs"
-                    >
-                      {getCallStatusLabel(call.status)}
-                    </Badge>
-                  </div>
-                </Link>
-              ))}
+                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                      {call.costFcfa && parseFloat(call.costFcfa) > 0 && (
+                        <span className="text-xs text-muted-foreground hidden md:block">
+                          {formatFcfa(parseFloat(call.costFcfa))}
+                        </span>
+                      )}
+                      <Badge
+                        variant={callStatusColors[call.status] ?? "secondary"}
+                        className="text-xs"
+                      >
+                        {getCallStatusLabel(call.status)}
+                      </Badge>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           )}
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-6 pt-4 border-t">
               <p className="text-sm text-muted-foreground">
