@@ -8,6 +8,8 @@ const nextConfig = {
       { protocol: "https", hostname: "storage.vapi.ai" },
       { protocol: "https", hostname: "**.elevenlabs.io" },
       { protocol: "https", hostname: "*.googleusercontent.com" },
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "plus.unsplash.com" },
     ],
   },
   poweredByHeader: false,

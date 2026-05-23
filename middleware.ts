@@ -74,16 +74,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 
-  // Redirection si déjà connecté
-  if (user && AUTH_PATHS.has(pathname)) {
+  // Redirection si déjà connecté depuis les pages d'auth ou la landing
+  if (user && (AUTH_PATHS.has(pathname) || pathname === "/")) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
-  // Racine
-  if (pathname === "/") {
-    return NextResponse.redirect(
-      new URL(user ? "/dashboard" : "/login", request.url)
-    );
   }
 
   return supabaseResponse;
