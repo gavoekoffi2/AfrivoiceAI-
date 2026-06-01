@@ -152,19 +152,20 @@ export async function POST(req: Request) {
     );
 
     // Déclencher l'appel directement (in-process), sans round-trip HTTP ni
-    // partage de la clé service-role. Exécuté en tâche de fond pour répondre
-    // rapidement au webhook (Shopify exige une réponse < 5s).
-    void initiateEcommerceCall(order, organizationId).catch((err) =>
+    // partage de la clé service-role. On ATTEND la fin : en serverless le
+    // travail post-réponse est tué. L'idempotence (index unique) garantit
+    // l'absence de double appel si Shopify renvoie le webhook (retry).
+    const callResult = await initiateEcommerceCall(order, organizationId);
+    if (!callResult.ok) {
       console.error(
-        `[shopify/webhook] Erreur déclenchement appel pour commande ${order.id}:`,
-        err
-      )
-    );
+        `[shopify/webhook] Initiation appel échouée pour commande ${order.id}: ${callResult.code}`
+      );
+    }
 
     return NextResponse.json({
       received: true,
       orderId: order.id,
-      action: "call_initiated",
+      action: callResult.ok ? "call_initiated" : "call_failed",
     });
   } catch (error) {
     console.error("[shopify/webhook] Erreur:", error);

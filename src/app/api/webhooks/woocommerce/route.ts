@@ -181,14 +181,19 @@ export async function POST(req: Request) {
       `[woocommerce/webhook] Commande COD créée: ${order.id} pour ${customerName}`
     );
 
-    void initiateEcommerceCall(order, organizationId).catch((err) =>
-      console.error(`[woocommerce/webhook] Erreur déclenchement appel:`, err)
-    );
+    // On attend la fin (serverless : pas de travail post-réponse).
+    // Idempotence (index unique) => pas de double appel sur retry WooCommerce.
+    const callResult = await initiateEcommerceCall(order, organizationId);
+    if (!callResult.ok) {
+      console.error(
+        `[woocommerce/webhook] Initiation appel échouée pour commande ${order.id}: ${callResult.code}`
+      );
+    }
 
     return NextResponse.json({
       received: true,
       orderId: order.id,
-      action: "call_initiated",
+      action: callResult.ok ? "call_initiated" : "call_failed",
     });
   } catch (error) {
     console.error("[woocommerce/webhook] Erreur:", error);

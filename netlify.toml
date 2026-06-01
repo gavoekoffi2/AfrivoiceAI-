@@ -1,0 +1,16 @@
+# Déploiement Netlify (Next.js App Router via @netlify/plugin-nextjs).
+# Les variables d'environnement (Supabase, Vapi, DATABASE_URL, etc.) se
+# configurent dans Netlify → Site settings → Environment variables.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NEXT_TELEMETRY_DISABLED = "1"
+  # Pool Postgres adapté au serverless (max 1 + compat PgBouncer).
+  DB_SERVERLESS = "true"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

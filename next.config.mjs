@@ -19,7 +19,9 @@ const securityHeaders = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
+  // `standalone` pour l'auto-hébergement Docker. Sous Netlify, on laisse le
+  // runtime Next gérer le bundling (NETLIFY=true est défini au build).
+  output: process.env.NETLIFY ? undefined : "standalone",
   poweredByHeader: false,
   async headers() {
     return [
