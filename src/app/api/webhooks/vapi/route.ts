@@ -4,6 +4,10 @@ import { calls, orders, leads, wallets, transactions } from "@/lib/db/schema";
 import { eq, and, ne, sql } from "drizzle-orm";
 import { verifyVapiWebhook } from "@/lib/vapi/verify";
 import { calculateClientCostFcfa } from "@/lib/utils/billing";
+import {
+  resolveOrderOutcome,
+  resolveLeadQualified,
+} from "@/lib/calls/outcome";
 
 interface VapiEndOfCallReport {
   message: {
@@ -18,6 +22,10 @@ interface VapiEndOfCallReport {
     recordingUrl?: string;
     transcript?: string;
     summary?: string;
+    analysis?: {
+      structuredData?: unknown;
+      summary?: string;
+    };
   };
 }
 
@@ -32,97 +40,6 @@ interface VapiStatusUpdate {
 }
 
 type VapiWebhookPayload = VapiEndOfCallReport | VapiStatusUpdate;
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/** Détecte un mot/expression en respectant les frontières de mots (FR/EN). */
-function mentions(text: string, keywords: string[]): boolean {
-  return keywords.some((kw) => {
-    if (/\s/.test(kw)) return text.includes(kw);
-    const re = new RegExp(
-      `(^|[^a-zàâäéèêëîïôöùûüç])${escapeRegExp(kw)}([^a-zàâäéèêëîïôöùûüç]|$)`,
-      "i"
-    );
-    return re.test(text);
-  });
-}
-
-/**
- * Détermine l'issue d'une commande à partir du résumé IA (signal principal,
- * plus fiable que le transcript brut qui contient le script de l'assistant).
- *
- * Choix produit : en cas d'ambiguïté on NE confirme PAS automatiquement —
- * confirmer à tort une commande COD entraîne une livraison non désirée et une
- * perte financière. Le défaut sûr est "no_answer" (revue manuelle / relance).
- */
-function analyzeCallOutcome(
-  summary: string,
-  transcript: string
-): "confirmed" | "cancelled" | "no_answer" {
-  const primary = (summary || "").toLowerCase();
-  const full = `${summary || ""} ${transcript || ""}`.toLowerCase();
-
-  const noAnswerKw = [
-    "pas de réponse",
-    "n'a pas répondu",
-    "ne répond pas",
-    "messagerie",
-    "répondeur",
-    "voicemail",
-    "injoignable",
-    "occupé",
-    "no answer",
-    "no-answer",
-    "did not answer",
-  ];
-  const cancelKw = [
-    "annul",
-    "annulé",
-    "annulée",
-    "ne confirme pas",
-    "pas intéressé",
-    "n'est pas intéressé",
-    "refuse",
-    "refusé",
-    "ne veut pas",
-    "ne souhaite pas",
-    "mauvais numéro",
-    "cancel",
-    "cancelled",
-    "not interested",
-    "declined",
-  ];
-  const confirmKw = [
-    "confirme",
-    "confirmé",
-    "confirmée",
-    "a confirmé",
-    "accepte",
-    "accepté",
-    "validé",
-    "valide la commande",
-    "d'accord pour",
-    "sera disponible",
-    "confirm",
-    "confirmed",
-    "accepted",
-    "agreed",
-  ];
-
-  // Boîte vocale / absence de réponse : prioritaire.
-  if (mentions(full, noAnswerKw)) return "no_answer";
-  // Annulation explicite prime sur confirmation.
-  if (mentions(primary, cancelKw)) return "cancelled";
-  if (mentions(primary, confirmKw)) return "confirmed";
-  // Repli sur le transcript complet pour une confirmation explicite.
-  if (mentions(full, cancelKw)) return "cancelled";
-  if (mentions(full, confirmKw)) return "confirmed";
-
-  // Ambigu -> défaut sûr (pas d'auto-confirmation).
-  return "no_answer";
-}
 
 export async function POST(req: Request) {
   try {
@@ -158,9 +75,10 @@ export async function POST(req: Request) {
 
     // Rapport de fin d'appel
     if (type === "end-of-call-report") {
-      const { call, recordingUrl, transcript, summary } = (
+      const { call, recordingUrl, transcript, summary, analysis } = (
         payload as VapiEndOfCallReport
       ).message;
+      const structuredData = analysis?.structuredData;
 
       const callResult = await db
         .select()
@@ -181,10 +99,10 @@ export async function POST(req: Request) {
       const costFcfa = calculateClientCostFcfa(costUsd);
       const durationSeconds = call.duration ?? 0;
 
-      let orderOutcome: "confirmed" | "cancelled" | "no_answer" | null = null;
-      if (dbCall.orderId) {
-        orderOutcome = analyzeCallOutcome(summary ?? "", transcript ?? "");
-      }
+      // Issue déterministe (structured data Vapi) avec repli heuristique.
+      const orderOutcome = dbCall.orderId
+        ? resolveOrderOutcome({ structuredData, summary, transcript })
+        : null;
 
       let alreadyProcessed = false;
 
@@ -253,11 +171,9 @@ export async function POST(req: Request) {
 
         // Statut du lead associé.
         if (dbCall.leadId) {
-          const s = (summary ?? "").toLowerCase();
-          const leadStatus =
-            mentions(s, ["intéressé", "qualifié", "interested", "qualified"])
-              ? "qualified"
-              : "not_interested";
+          const leadStatus = resolveLeadQualified({ structuredData, summary })
+            ? "qualified"
+            : "not_interested";
 
           await tx
             .update(leads)

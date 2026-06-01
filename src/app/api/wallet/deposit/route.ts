@@ -13,6 +13,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
+    // Garde-fou : la recharge "simulée" crédite un solde réel qui finance des
+    // appels facturés (Vapi/ElevenLabs). Sans intégration de paiement, on évite
+    // que n'importe qui s'octroie du crédit gratuit en production : activation
+    // explicite requise hors développement, et rôle autorisé uniquement.
+    const simulatedDepositsEnabled =
+      process.env.ENABLE_SIMULATED_DEPOSITS === "true" ||
+      process.env.NODE_ENV !== "production";
+    if (!simulatedDepositsEnabled) {
+      return NextResponse.json(
+        {
+          error:
+            "Recharge indisponible : intégration de paiement (Mobile Money/Stripe) requise.",
+        },
+        { status: 403 }
+      );
+    }
+    if (session.role !== "owner" && session.role !== "admin") {
+      return NextResponse.json(
+        { error: "Action réservée aux administrateurs de l'organisation." },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     const validated = depositSchema.safeParse(body);
 

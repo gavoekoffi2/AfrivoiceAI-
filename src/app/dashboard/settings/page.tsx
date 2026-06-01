@@ -129,6 +129,7 @@ export default async function SettingsPage() {
                 organizationId={session.organizationId}
                 initialName={organization?.name ?? ""}
                 initialShopName={organization?.shopName ?? ""}
+                initialShopDomain={organization?.shopDomain ?? ""}
               />
             </CardContent>
           </Card>

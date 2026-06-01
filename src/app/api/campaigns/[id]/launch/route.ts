@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { getUserSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { campaigns, leads, calls, wallets } from "@/lib/db/schema";
+import { campaigns, leads, wallets } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { hasSufficientBalance } from "@/lib/utils/billing";
-import { getVapiClient, generateProspectingPrompt } from "@/lib/vapi/client";
-import { normalizePhoneNumber } from "@/lib/utils";
+import { initiateProspectingCall } from "@/lib/calls/initiate";
 
 const BATCH_DELAY_MS = 2000; // 2 secondes entre chaque appel
+const MAX_BATCH = 10; // Limite d'appels par lot
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -25,7 +25,6 @@ export async function POST(
 
     const campaignId = params.id;
 
-    // Vérifier la campagne
     const campaignResult = await db
       .select()
       .from(campaigns)
@@ -53,34 +52,24 @@ export async function POST(
       );
     }
 
-    // Vérifier le solde
     const walletResult = await db
       .select()
       .from(wallets)
       .where(eq(wallets.organizationId, session.organizationId))
       .limit(1);
 
-    if (
-      !walletResult[0] ||
-      !hasSufficientBalance(walletResult[0].balanceFcfa)
-    ) {
+    if (!walletResult[0] || !hasSufficientBalance(walletResult[0].balanceFcfa)) {
       return NextResponse.json(
         { error: "Solde insuffisant pour lancer des appels." },
         { status: 402 }
       );
     }
 
-    // Récupérer les leads en attente
     const pendingLeads = await db
-      .select()
+      .select({ id: leads.id })
       .from(leads)
-      .where(
-        and(
-          eq(leads.campaignId, campaignId),
-          eq(leads.status, "new")
-        )
-      )
-      .limit(10); // Limite à 10 appels par batch
+      .where(and(eq(leads.campaignId, campaignId), eq(leads.status, "new")))
+      .limit(MAX_BATCH);
 
     if (pendingLeads.length === 0) {
       return NextResponse.json({
@@ -89,100 +78,48 @@ export async function POST(
       });
     }
 
-    const vapi = getVapiClient();
     let launched = 0;
-    const errors: string[] = [];
+    let errors = 0;
+    let stoppedForBalance = false;
 
-    for (const lead of pendingLeads) {
-      try {
-        // Vérifier le solde avant chaque appel
-        const freshWallet = await db
-          .select({ balance: wallets.balanceFcfa })
-          .from(wallets)
-          .where(eq(wallets.organizationId, session.organizationId))
-          .limit(1);
+    for (const [index, lead] of pendingLeads.entries()) {
+      const result = await initiateProspectingCall(
+        lead.id,
+        campaignId,
+        session.organizationId
+      );
 
-        if (!freshWallet[0] || !hasSufficientBalance(freshWallet[0].balance)) {
-          console.log("[batch/launch] Solde insuffisant, arrêt du batch");
-          break;
-        }
-
-        const phone = normalizePhoneNumber(lead.phone, "TG") ?? lead.phone;
-        const systemPrompt = generateProspectingPrompt({
-          objective: campaign.objective,
-          scriptTemplate: campaign.scriptTemplate,
-          leadName: lead.name ?? undefined,
-          companyName: lead.company ?? undefined,
-        });
-
-        const callResponse = await vapi.calls.create({
-          phoneNumberId: process.env.VAPI_PHONE_NUMBER_ID!,
-          customer: {
-            number: phone,
-            name: lead.name ?? undefined,
-          },
-          assistant: {
-            model: {
-              provider: "google",
-              model: "gemini-1.5-flash",
-              messages: [{ role: "system", content: systemPrompt }],
-              maxTokens: 300,
-              temperature: 0.7,
-            },
-            voice: {
-              provider: "11labs",
-              voiceId: process.env.ELEVENLABS_VOICE_ID ?? "EXAVITQu4vr4xnSDxMaL",
-            },
-            firstMessage: lead.name
-              ? `Bonjour ${lead.name}, comment allez-vous ?`
-              : "Bonjour, comment allez-vous ?",
-            artifactPlan: { recordingEnabled: true },
-          },
-        });
-
-        if (!("id" in callResponse)) {
-          throw new Error("Réponse Vapi inattendue (batch non supporté)");
-        }
-
-        // Enregistrer l'appel et mettre à jour le lead
-        await db.transaction(async (tx) => {
-          await tx.insert(calls).values({
-            organizationId: session.organizationId,
-            vapiCallId: callResponse.id,
-            leadId: lead.id,
-            type: "prospecting",
-            status: "queued",
-          });
-
-          await tx
-            .update(leads)
-            .set({ status: "called" })
-            .where(eq(leads.id, lead.id));
-        });
-
+      if (result.ok) {
         launched++;
-        console.log(`[batch/launch] Appel lancé: ${callResponse.id} → ${phone}`);
+      } else if (result.code === "insufficient_balance") {
+        // La logique partagée revérifie le solde à chaque appel : on s'arrête net.
+        stoppedForBalance = true;
+        break;
+      } else {
+        errors++;
+        console.error(`[batch/launch] Échec lead ${lead.id}: ${result.code}`);
+      }
 
-        // Délai entre les appels pour éviter les rate limits
-        if (launched < pendingLeads.length) {
-          await sleep(BATCH_DELAY_MS);
-        }
-      } catch (err) {
-        console.error(`[batch/launch] Erreur pour lead ${lead.id}:`, err);
-        errors.push(lead.id);
+      // Délai entre les appels pour éviter les rate limits Vapi.
+      if (index < pendingLeads.length - 1) {
+        await sleep(BATCH_DELAY_MS);
       }
     }
 
-    // Mettre à jour les compteurs de la campagne
-    await db
-      .update(campaigns)
-      .set({ calledLeads: campaign.calledLeads + launched })
-      .where(eq(campaigns.id, campaignId));
+    if (launched > 0) {
+      await db
+        .update(campaigns)
+        .set({ calledLeads: campaign.calledLeads + launched })
+        .where(eq(campaigns.id, campaignId));
+    }
 
     return NextResponse.json({
       launched,
-      errors: errors.length,
-      message: `${launched} appel(s) lancé(s) avec succès.`,
+      errors,
+      stoppedForBalance,
+      message: stoppedForBalance
+        ? `${launched} appel(s) lancé(s). Arrêt : solde insuffisant.`
+        : `${launched} appel(s) lancé(s) avec succès.`,
     });
   } catch (error) {
     console.error("[batch/launch] Erreur:", error);

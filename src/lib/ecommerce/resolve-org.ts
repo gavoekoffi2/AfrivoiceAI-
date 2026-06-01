@@ -25,24 +25,37 @@ export async function resolveOrganizationForShop(
       name: organizations.name,
       slug: organizations.slug,
       shopName: organizations.shopName,
+      shopDomain: organizations.shopDomain,
     })
     .from(organizations);
 
   if (orgs.length === 0) return null;
-  if (orgs.length === 1) return orgs[0].id;
-  if (!shopIdentifier) return null;
 
   // Ex: "ma-boutique.myshopify.com" ou "https://ma-boutique.com/"
-  const needle = normalize(
-    shopIdentifier.replace(/^https?:\/\//, "").replace(/\/$/, "")
-  );
-  const handle = needle.split(".")[0];
+  const needle = shopIdentifier
+    ? normalize(shopIdentifier.replace(/^https?:\/\//, "").replace(/\/$/, ""))
+    : null;
+  const handle = needle ? needle.split(".")[0] : null;
 
+  // 1) Correspondance explicite et fiable sur le domaine configuré (multi-tenant).
+  if (needle) {
+    const byDomain = orgs.find(
+      (o) => o.shopDomain && normalize(o.shopDomain) === needle
+    );
+    if (byDomain) return byDomain.id;
+  }
+
+  // 2) Mono-tenant / démo : une seule organisation -> on l'utilise.
+  if (orgs.length === 1) return orgs[0].id;
+
+  // 3) Repli prudent : correspondance sur le nom/slug. En l'absence de
+  //    correspondance, on refuse plutôt que de router vers la mauvaise org.
+  if (!needle) return null;
   const match = orgs.find((o) => {
     const candidates = [o.shopName, o.slug, o.name]
       .filter((v): v is string => Boolean(v))
       .map(normalize);
-    return candidates.includes(needle) || candidates.includes(handle);
+    return candidates.includes(needle) || (handle ? candidates.includes(handle) : false);
   });
 
   return match?.id ?? null;

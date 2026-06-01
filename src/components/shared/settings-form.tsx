@@ -11,15 +11,18 @@ interface SettingsFormProps {
   organizationId: string;
   initialName: string;
   initialShopName: string;
+  initialShopDomain: string;
 }
 
 export function SettingsForm({
   organizationId,
   initialName,
   initialShopName,
+  initialShopDomain,
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
   const [shopName, setShopName] = useState(initialShopName);
+  const [shopDomain, setShopDomain] = useState(initialShopDomain);
   const [isPending, startTransition] = useTransition();
 
   function handleSave() {
@@ -28,7 +31,7 @@ export function SettingsForm({
         const res = await fetch("/api/settings", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, shopName }),
+          body: JSON.stringify({ name, shopName, shopDomain }),
         });
 
         const data = await res.json();
@@ -72,6 +75,19 @@ export function SettingsForm({
             Utilisé par l&apos;IA lors des appels de confirmation
           </p>
         </div>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="shopDomain">Domaine de la boutique</Label>
+        <Input
+          id="shopDomain"
+          value={shopDomain}
+          onChange={(e) => setShopDomain(e.target.value)}
+          placeholder="ma-boutique.myshopify.com"
+        />
+        <p className="text-xs text-muted-foreground">
+          Indispensable en multi-boutiques : permet d&apos;aiguiller les
+          webhooks Shopify/WooCommerce vers la bonne organisation.
+        </p>
       </div>
       <Button
         onClick={handleSave}

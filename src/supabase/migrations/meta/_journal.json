@@ -8,6 +8,13 @@
       "when": 1780316669773,
       "tag": "0000_windy_ghost_rider",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1780321271667,
+      "tag": "0001_swift_molten_man",
+      "breakpoints": true
     }
   ]
 }

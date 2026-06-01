@@ -12,6 +12,21 @@ const updateSettingsSchema = z.object({
   // shopName peut être vidé (chaîne vide) pour le réinitialiser.
   shopName: z.string().max(100).optional(),
   name: z.string().min(2).max(100).optional(),
+  // Domaine boutique normalisé (sans protocole ni slash final) ; "" => null
+  // (null requis pour ne pas violer la contrainte unique entre organisations).
+  shopDomain: z
+    .string()
+    .max(255)
+    .optional()
+    .transform((v) => {
+      if (v === undefined) return undefined;
+      const cleaned = v
+        .trim()
+        .replace(/^https?:\/\//, "")
+        .replace(/\/$/, "")
+        .toLowerCase();
+      return cleaned === "" ? null : cleaned;
+    }),
 });
 
 export async function GET() {
@@ -58,13 +73,27 @@ export async function PATCH(req: Request) {
       );
     }
 
-    const updated = await db
-      .update(organizations)
-      .set(validated.data)
-      .where(eq(organizations.id, session.organizationId))
-      .returning();
+    try {
+      const updated = await db
+        .update(organizations)
+        .set(validated.data)
+        .where(eq(organizations.id, session.organizationId))
+        .returning();
 
-    return NextResponse.json({ organization: updated[0] });
+      return NextResponse.json({ organization: updated[0] });
+    } catch (dbError) {
+      // Violation de contrainte unique (domaine déjà associé à une autre org).
+      if (
+        dbError instanceof Error &&
+        /duplicate key|unique/i.test(dbError.message)
+      ) {
+        return NextResponse.json(
+          { error: "Ce domaine de boutique est déjà utilisé." },
+          { status: 409 }
+        );
+      }
+      throw dbError;
+    }
   } catch (error) {
     console.error("[settings] PATCH Erreur:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });

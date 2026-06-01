@@ -19,6 +19,43 @@ export type InitiateResult =
 
 const DEFAULT_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
 
+// Extraction déterministe de l'issue par Vapi (call.analysis.structuredData),
+// indépendante du résumé conversationnel. Voir lib/calls/outcome.ts.
+const ECOMMERCE_ANALYSIS_PLAN = {
+  structuredDataPlan: {
+    enabled: true,
+    schema: {
+      type: "object" as const,
+      properties: {
+        outcome: {
+          type: "string",
+          enum: ["confirmed", "cancelled", "no_answer"],
+          description:
+            "Issue de l'appel de confirmation de commande. 'confirmed' si le client confirme/accepte la commande ; 'cancelled' s'il annule, refuse ou n'est pas intéressé ; 'no_answer' s'il n'y a pas eu de réponse (messagerie, injoignable).",
+        },
+      },
+      required: ["outcome"],
+    },
+  },
+};
+
+const PROSPECTING_ANALYSIS_PLAN = {
+  structuredDataPlan: {
+    enabled: true,
+    schema: {
+      type: "object" as const,
+      properties: {
+        qualified: {
+          type: "boolean",
+          description:
+            "true si le prospect est intéressé/qualifié par rapport à l'objectif de l'appel, false sinon.",
+        },
+      },
+      required: ["qualified"],
+    },
+  },
+};
+
 function requireVapiConfig() {
   const phoneNumberId = process.env.VAPI_PHONE_NUMBER_ID;
   if (!phoneNumberId) {
@@ -98,6 +135,7 @@ export async function initiateEcommerceCall(
           model: "nova-2",
           language: "fr",
         },
+        analysisPlan: ECOMMERCE_ANALYSIS_PLAN,
       },
     });
 
@@ -234,6 +272,7 @@ export async function initiateProspectingCall(
           model: "nova-2",
           language: "fr",
         },
+        analysisPlan: PROSPECTING_ANALYSIS_PLAN,
       },
     });
 
