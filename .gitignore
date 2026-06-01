@@ -37,3 +37,6 @@ next-env.d.ts
 
 # drizzle — les migrations DOIVENT être versionnées (déploiement reproductible)
 # (ne rien ignorer ici)
+
+# Local Netlify folder
+.netlify
