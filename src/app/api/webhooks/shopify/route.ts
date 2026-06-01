@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { orders, organizations, users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { orders } from "@/lib/db/schema";
 import { verifyShopifyWebhook, isCashOnDelivery } from "@/lib/shopify/verify";
 import { normalizePhoneNumber } from "@/lib/utils";
+import { resolveOrganizationForShop } from "@/lib/ecommerce/resolve-org";
+import { initiateEcommerceCall } from "@/lib/calls/initiate";
 
 interface ShopifyOrderPayload {
   id: number;
@@ -41,7 +42,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Signature invalide" }, { status: 401 });
     }
 
-    const payload: ShopifyOrderPayload = JSON.parse(rawBody);
     const topic = req.headers.get("x-shopify-topic");
 
     // Ne traiter que les créations de commande
@@ -49,21 +49,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ received: true });
     }
 
+    let payload: ShopifyOrderPayload;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ error: "Payload invalide" }, { status: 400 });
+    }
+
     // Vérifier si c'est une commande COD
-    if (!isCashOnDelivery(payload.gateway)) {
+    if (!isCashOnDelivery(payload.gateway ?? "")) {
       console.log(
         `[shopify/webhook] Commande ${payload.id} ignorée (gateway: ${payload.gateway})`
       );
       return NextResponse.json({ received: true, action: "ignored_non_cod" });
     }
 
-    // Trouver l'organisation via le domaine Shopify (simplifié ici)
-    // En production, mapper shopDomain → organizationId via une table de configuration
-    const orgResult = await db.select().from(organizations).limit(1);
-    const organization = orgResult[0];
-
-    if (!organization) {
-      console.error("[shopify/webhook] Aucune organisation trouvée");
+    // Router la commande vers la bonne organisation
+    const organizationId = await resolveOrganizationForShop(shopDomain);
+    if (!organizationId) {
+      console.error(
+        `[shopify/webhook] Organisation introuvable pour le domaine: ${shopDomain ?? "inconnu"}`
+      );
       return NextResponse.json(
         { error: "Organisation introuvable" },
         { status: 404 }
@@ -71,13 +77,11 @@ export async function POST(req: Request) {
     }
 
     // Extraire les données du client
-    const customerName = [
-      payload.customer?.first_name,
-      payload.customer?.last_name,
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .trim() || "Client";
+    const customerName =
+      [payload.customer?.first_name, payload.customer?.last_name]
+        .filter(Boolean)
+        .join(" ")
+        .trim() || "Client";
 
     const rawPhone =
       payload.shipping_address?.phone ||
@@ -113,11 +117,13 @@ export async function POST(req: Request) {
       .filter(Boolean)
       .join(", ");
 
-    // Insérer la commande
+    // Insertion idempotente : si Shopify renvoie le même webhook (retries),
+    // la contrainte unique (org, source, externalId) empêche les doublons
+    // et donc le double-appel facturé.
     const insertedOrder = await db
       .insert(orders)
       .values({
-        organizationId: organization.id,
+        organizationId,
         externalId: payload.id.toString(),
         source: "shopify",
         customerName,
@@ -126,33 +132,38 @@ export async function POST(req: Request) {
         totalAmount: payload.total_price,
         currency: payload.currency || "XOF",
         status: "pending",
-        rawPayload: payload as Record<string, unknown>,
+        rawPayload: payload,
+      })
+      .onConflictDoNothing({
+        target: [orders.organizationId, orders.source, orders.externalId],
       })
       .returning();
 
+    if (!insertedOrder[0]) {
+      console.log(
+        `[shopify/webhook] Commande ${payload.id} déjà traitée (doublon ignoré)`
+      );
+      return NextResponse.json({ received: true, action: "duplicate_ignored" });
+    }
+
+    const order = insertedOrder[0];
     console.log(
-      `[shopify/webhook] Commande COD créée: ${insertedOrder[0].id} pour ${customerName}`
+      `[shopify/webhook] Commande COD créée: ${order.id} pour ${customerName}`
     );
 
-    // Déclencher l'appel de confirmation de manière asynchrone
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-    fetch(`${baseUrl}/api/calls/initiate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-internal-secret": process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
-      },
-      body: JSON.stringify({ orderId: insertedOrder[0].id }),
-    }).catch((err) => {
+    // Déclencher l'appel directement (in-process), sans round-trip HTTP ni
+    // partage de la clé service-role. Exécuté en tâche de fond pour répondre
+    // rapidement au webhook (Shopify exige une réponse < 5s).
+    void initiateEcommerceCall(order, organizationId).catch((err) =>
       console.error(
-        `[shopify/webhook] Erreur déclenchement appel pour commande ${insertedOrder[0].id}:`,
+        `[shopify/webhook] Erreur déclenchement appel pour commande ${order.id}:`,
         err
-      );
-    });
+      )
+    );
 
     return NextResponse.json({
       received: true,
-      orderId: insertedOrder[0].id,
+      orderId: order.id,
       action: "call_initiated",
     });
   } catch (error) {

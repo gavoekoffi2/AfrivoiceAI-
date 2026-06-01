@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { getUserSession } from "@/lib/auth";
 import { getWalletWithTransactions } from "@/lib/db/queries";
 
+// Données propres à l'utilisateur connecté : jamais mises en cache.
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const session = await getUserSession();

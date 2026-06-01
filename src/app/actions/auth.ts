@@ -1,6 +1,7 @@
 "use server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { provisionUserAndOrg } from "@/lib/auth";
 import { registerSchema, loginSchema } from "@/lib/validations/auth";
 import { redirect } from "next/navigation";
 
@@ -37,11 +38,39 @@ export async function registerAction(formData: FormData) {
     return { error: error.message };
   }
 
+  // Supabase renvoie un `user` avec identities vides quand l'email existe déjà
+  // (anti-énumération). On évite alors de créer une organisation orpheline.
+  const isExistingUser =
+    data.user && (data.user.identities?.length ?? 0) === 0;
+  if (isExistingUser) {
+    return { error: "Cette adresse email est déjà utilisée." };
+  }
+
   if (data.user) {
+    try {
+      await provisionUserAndOrg({
+        authUserId: data.user.id,
+        email: validated.data.email,
+        organizationName: validated.data.organizationName,
+      });
+    } catch (provisionError) {
+      console.error("[auth] Échec du provisionnement:", provisionError);
+      return {
+        error:
+          "Compte créé mais initialisation impossible. Contactez le support.",
+      };
+    }
+  }
+
+  // Session immédiate uniquement si la confirmation email est désactivée.
+  if (data.session) {
     redirect("/dashboard");
   }
 
-  return { success: true, message: "Vérifiez votre email pour confirmer votre compte." };
+  return {
+    success: true,
+    message: "Vérifiez votre email pour confirmer votre compte.",
+  };
 }
 
 export async function loginAction(formData: FormData) {

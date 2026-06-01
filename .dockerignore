@@ -1,0 +1,31 @@
+# Dependencies & build artifacts (réinstallés/rebuild dans l'image)
+node_modules
+.next
+out
+build
+coverage
+
+# Secrets & environnement local — NE JAMAIS copier dans l'image
+.env
+.env.*
+!.env.example
+
+# Git & métadonnées
+.git
+.gitignore
+.github
+
+# Outils & éditeurs
+.vscode
+.idea
+*.log
+npm-debug.log*
+
+# Docker / infra
+Dockerfile
+docker-compose.yml
+nginx/ssl
+
+# Divers
+.DS_Store
+README*.md

@@ -5,6 +5,9 @@ import { campaigns } from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { createCampaignSchema } from "@/lib/validations/campaign";
 
+// Données propres à l'organisation connectée : jamais mises en cache.
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const session = await getUserSession();

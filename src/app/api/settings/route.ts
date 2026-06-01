@@ -5,8 +5,12 @@ import { organizations } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import * as z from "zod";
 
+// Données propres à l'organisation connectée : jamais mises en cache.
+export const dynamic = "force-dynamic";
+
 const updateSettingsSchema = z.object({
-  shopName: z.string().min(1).max(100).optional(),
+  // shopName peut être vidé (chaîne vide) pour le réinitialiser.
+  shopName: z.string().max(100).optional(),
   name: z.string().min(2).max(100).optional(),
 });
 

@@ -136,10 +136,13 @@ export async function POST(
             firstMessage: lead.name
               ? `Bonjour ${lead.name}, comment allez-vous ?`
               : "Bonjour, comment allez-vous ?",
-            endCallFunctionEnabled: true,
-            recordingEnabled: true,
+            artifactPlan: { recordingEnabled: true },
           },
         });
+
+        if (!("id" in callResponse)) {
+          throw new Error("Réponse Vapi inattendue (batch non supporté)");
+        }
 
         // Enregistrer l'appel et mettre à jour le lead
         await db.transaction(async (tx) => {

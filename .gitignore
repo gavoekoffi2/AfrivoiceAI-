@@ -35,5 +35,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# drizzle
-/src/supabase/migrations/*.sql
+# drizzle — les migrations DOIVENT être versionnées (déploiement reproductible)
+# (ne rien ignorer ici)

@@ -30,6 +30,7 @@ services:
       ELEVENLABS_VOICE_ID: ${ELEVENLABS_VOICE_ID}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       SHOPIFY_WEBHOOK_SECRET: ${SHOPIFY_WEBHOOK_SECRET}
+      WOOCOMMERCE_WEBHOOK_SECRET: ${WOOCOMMERCE_WEBHOOK_SECRET}
       EXCHANGE_RATE_USD_TO_FCFA: ${EXCHANGE_RATE_USD_TO_FCFA:-600}
       PROFIT_MARGIN_PERCENTAGE: ${PROFIT_MARGIN_PERCENTAGE:-30}
     depends_on:
@@ -55,7 +56,9 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./src/supabase/migrations/seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
+      # Applique automatiquement les migrations Drizzle à l'initialisation de la DB.
+      # (Postgres exécute les *.sql à la racine ; le sous-dossier meta/ est ignoré.)
+      - ./src/supabase/migrations:/docker-entrypoint-initdb.d:ro
     networks:
       - afrivoice-network
     healthcheck:

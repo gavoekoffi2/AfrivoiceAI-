@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { calls, orders, leads, wallets, transactions } from "@/lib/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, ne, sql } from "drizzle-orm";
 import { verifyVapiWebhook } from "@/lib/vapi/verify";
 import { calculateClientCostFcfa } from "@/lib/utils/billing";
 
@@ -33,47 +33,95 @@ interface VapiStatusUpdate {
 
 type VapiWebhookPayload = VapiEndOfCallReport | VapiStatusUpdate;
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Détecte un mot/expression en respectant les frontières de mots (FR/EN). */
+function mentions(text: string, keywords: string[]): boolean {
+  return keywords.some((kw) => {
+    if (/\s/.test(kw)) return text.includes(kw);
+    const re = new RegExp(
+      `(^|[^a-zàâäéèêëîïôöùûüç])${escapeRegExp(kw)}([^a-zàâäéèêëîïôöùûüç]|$)`,
+      "i"
+    );
+    return re.test(text);
+  });
+}
+
 /**
- * Analyse le résumé de l'appel pour déterminer le résultat de la commande
+ * Détermine l'issue d'une commande à partir du résumé IA (signal principal,
+ * plus fiable que le transcript brut qui contient le script de l'assistant).
+ *
+ * Choix produit : en cas d'ambiguïté on NE confirme PAS automatiquement —
+ * confirmer à tort une commande COD entraîne une livraison non désirée et une
+ * perte financière. Le défaut sûr est "no_answer" (revue manuelle / relance).
  */
 function analyzeCallOutcome(
   summary: string,
   transcript: string
 ): "confirmed" | "cancelled" | "no_answer" {
-  const combined = `${summary} ${transcript}`.toLowerCase();
+  const primary = (summary || "").toLowerCase();
+  const full = `${summary || ""} ${transcript || ""}`.toLowerCase();
 
-  const cancelKeywords = [
+  const noAnswerKw = [
+    "pas de réponse",
+    "n'a pas répondu",
+    "ne répond pas",
+    "messagerie",
+    "répondeur",
+    "voicemail",
+    "injoignable",
+    "occupé",
+    "no answer",
+    "no-answer",
+    "did not answer",
+  ];
+  const cancelKw = [
     "annul",
     "annulé",
+    "annulée",
+    "ne confirme pas",
     "pas intéressé",
-    "non",
-    "refuse",
-    "ne veut pas",
     "n'est pas intéressé",
+    "refuse",
+    "refusé",
+    "ne veut pas",
+    "ne souhaite pas",
+    "mauvais numéro",
+    "cancel",
+    "cancelled",
+    "not interested",
+    "declined",
   ];
-  const confirmKeywords = [
+  const confirmKw = [
     "confirme",
     "confirmé",
-    "oui",
-    "d'accord",
-    "ok",
-    "parfait",
-    "livrer",
-    "disponible",
-  ];
-  const noAnswerKeywords = [
-    "pas de réponse",
-    "messagerie",
-    "occupé",
-    "voicemail",
-    "no-answer",
+    "confirmée",
+    "a confirmé",
+    "accepte",
+    "accepté",
+    "validé",
+    "valide la commande",
+    "d'accord pour",
+    "sera disponible",
+    "confirm",
+    "confirmed",
+    "accepted",
+    "agreed",
   ];
 
-  if (noAnswerKeywords.some((kw) => combined.includes(kw))) return "no_answer";
-  if (cancelKeywords.some((kw) => combined.includes(kw))) return "cancelled";
-  if (confirmKeywords.some((kw) => combined.includes(kw))) return "confirmed";
+  // Boîte vocale / absence de réponse : prioritaire.
+  if (mentions(full, noAnswerKw)) return "no_answer";
+  // Annulation explicite prime sur confirmation.
+  if (mentions(primary, cancelKw)) return "cancelled";
+  if (mentions(primary, confirmKw)) return "confirmed";
+  // Repli sur le transcript complet pour une confirmation explicite.
+  if (mentions(full, cancelKw)) return "cancelled";
+  if (mentions(full, confirmKw)) return "confirmed";
 
-  return "confirmed"; // Par défaut si l'appel s'est terminé normalement
+  // Ambigu -> défaut sûr (pas d'auto-confirmation).
+  return "no_answer";
 }
 
 export async function POST(req: Request) {
@@ -86,16 +134,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Signature invalide" }, { status: 401 });
     }
 
-    const payload: VapiWebhookPayload = JSON.parse(rawBody);
+    let payload: VapiWebhookPayload;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ error: "Payload invalide" }, { status: 400 });
+    }
+
     const { type } = payload.message;
 
-    // Mise à jour du statut en temps réel
+    // Mise à jour du statut en temps réel (ne jamais écraser un appel finalisé).
     if (type === "status-update") {
       const { call } = (payload as VapiStatusUpdate).message;
       await db
         .update(calls)
         .set({ status: call.status })
-        .where(eq(calls.vapiCallId, call.id));
+        .where(
+          and(eq(calls.vapiCallId, call.id), ne(calls.status, "completed"))
+        );
 
       return NextResponse.json({ received: true });
     }
@@ -106,7 +162,6 @@ export async function POST(req: Request) {
         payload as VapiEndOfCallReport
       ).message;
 
-      // Récupérer l'appel en base
       const callResult = await db
         .select()
         .from(calls)
@@ -116,35 +171,30 @@ export async function POST(req: Request) {
       const dbCall = callResult[0];
       if (!dbCall) {
         console.error(`[vapi/webhook] Appel introuvable: ${call.id}`);
-        return NextResponse.json({ error: "Appel introuvable" }, { status: 404 });
+        return NextResponse.json(
+          { error: "Appel introuvable" },
+          { status: 404 }
+        );
       }
 
       const costUsd = call.cost ?? 0;
       const costFcfa = calculateClientCostFcfa(costUsd);
       const durationSeconds = call.duration ?? 0;
 
-      // Récupérer le wallet
-      const walletResult = await db
-        .select()
-        .from(wallets)
-        .where(eq(wallets.organizationId, dbCall.organizationId))
-        .limit(1);
-
-      const wallet = walletResult[0];
-
-      // Analyser l'issue de la commande
       let orderOutcome: "confirmed" | "cancelled" | "no_answer" | null = null;
-      if (dbCall.orderId && summary && transcript) {
-        orderOutcome = analyzeCallOutcome(summary, transcript);
+      if (dbCall.orderId) {
+        orderOutcome = analyzeCallOutcome(summary ?? "", transcript ?? "");
       }
 
-      // Transaction atomique : mettre à jour l'appel + déduire du wallet
+      let alreadyProcessed = false;
+
       await db.transaction(async (tx) => {
-        // 1. Mettre à jour l'appel
-        await tx
+        // Finalisation idempotente : seul le premier rapport bascule l'appel en
+        // "completed". Les rappels Vapi (retries) ne re-déduisent donc pas.
+        const finalized = await tx
           .update(calls)
           .set({
-            status: call.status === "ended" ? "completed" : call.status,
+            status: "completed",
             durationSeconds,
             costUsd: costUsd.toString(),
             costFcfa: costFcfa.toString(),
@@ -153,32 +203,47 @@ export async function POST(req: Request) {
             summary: summary ?? null,
             endedReason: call.endedReason ?? null,
           })
-          .where(eq(calls.id, dbCall.id));
+          .where(and(eq(calls.id, dbCall.id), ne(calls.status, "completed")))
+          .returning({ id: calls.id });
 
-        // 2. Déduire le coût du wallet (si coût > 0)
-        if (wallet && costFcfa > 0) {
-          await tx.insert(transactions).values({
-            walletId: wallet.id,
-            type: "call_cost",
-            amountFcfa: (-costFcfa).toString(),
-            description: `Appel ${dbCall.type === "ecommerce_confirmation" ? "confirmation commande" : "prospection"} (${durationSeconds}s)`,
-            metadata: {
-              vapiCallId: call.id,
-              costUsd,
-              durationSeconds,
-            },
-          });
-
-          await tx
-            .update(wallets)
-            .set({
-              balanceFcfa: sql`${wallets.balanceFcfa} - ${costFcfa}`,
-              updatedAt: new Date(),
-            })
-            .where(eq(wallets.id, wallet.id));
+        if (finalized.length === 0) {
+          alreadyProcessed = true;
+          return;
         }
 
-        // 3. Mettre à jour le statut de la commande
+        // Déduire le coût du wallet (atomique).
+        if (costFcfa > 0) {
+          const walletResult = await tx
+            .select()
+            .from(wallets)
+            .where(eq(wallets.organizationId, dbCall.organizationId))
+            .limit(1);
+          const wallet = walletResult[0];
+
+          if (wallet) {
+            await tx.insert(transactions).values({
+              walletId: wallet.id,
+              type: "call_cost",
+              amountFcfa: (-costFcfa).toString(),
+              description: `Appel ${
+                dbCall.type === "ecommerce_confirmation"
+                  ? "confirmation commande"
+                  : "prospection"
+              } (${durationSeconds}s)`,
+              metadata: { vapiCallId: call.id, costUsd, durationSeconds },
+            });
+
+            await tx
+              .update(wallets)
+              .set({
+                balanceFcfa: sql`${wallets.balanceFcfa} - ${costFcfa}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(wallets.id, wallet.id));
+          }
+        }
+
+        // Statut de la commande associée.
         if (dbCall.orderId && orderOutcome) {
           await tx
             .update(orders)
@@ -186,11 +251,11 @@ export async function POST(req: Request) {
             .where(eq(orders.id, dbCall.orderId));
         }
 
-        // 4. Mettre à jour le statut du lead
+        // Statut du lead associé.
         if (dbCall.leadId) {
+          const s = (summary ?? "").toLowerCase();
           const leadStatus =
-            summary?.toLowerCase().includes("intéressé") ||
-            summary?.toLowerCase().includes("qualifié")
+            mentions(s, ["intéressé", "qualifié", "interested", "qualified"])
               ? "qualified"
               : "not_interested";
 
@@ -200,6 +265,11 @@ export async function POST(req: Request) {
             .where(eq(leads.id, dbCall.leadId));
         }
       });
+
+      if (alreadyProcessed) {
+        console.log(`[vapi/webhook] Rapport déjà traité (ignoré): ${call.id}`);
+        return NextResponse.json({ received: true, duplicate: true });
+      }
 
       console.log(
         `[vapi/webhook] Appel terminé: ${call.id} | Durée: ${durationSeconds}s | Coût: ${costFcfa} FCFA | Issue commande: ${orderOutcome ?? "N/A"}`

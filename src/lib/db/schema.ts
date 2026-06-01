@@ -7,6 +7,7 @@ import {
   jsonb,
   decimal,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // 1. Gestion des Utilisateurs et Organisations (Multi-tenant)
@@ -91,6 +92,13 @@ export const orders = pgTable(
   (table) => ({
     orgIdx: index("orders_org_idx").on(table.organizationId),
     statusIdx: index("orders_status_idx").on(table.status),
+    // Idempotence des webhooks : une commande externe ne peut être insérée
+    // qu'une seule fois par organisation/source (évite double appel = double débit).
+    externalUniq: uniqueIndex("orders_external_uniq").on(
+      table.organizationId,
+      table.source,
+      table.externalId
+    ),
   })
 );
 

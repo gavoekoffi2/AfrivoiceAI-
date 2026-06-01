@@ -4,6 +4,9 @@ import { getOrganizationStats } from "@/lib/db/queries";
 import { Sidebar } from "@/components/shared/sidebar";
 import { Header } from "@/components/shared/header";
 
+// Section authentifiée : dépend des cookies/DB, donc toujours rendue dynamiquement.
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({
   children,
 }: {
