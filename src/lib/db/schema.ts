@@ -7,6 +7,7 @@ import {
   jsonb,
   decimal,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // 1. Gestion des Utilisateurs et Organisations (Multi-tenant)
@@ -15,6 +16,10 @@ export const organizations = pgTable("organizations", {
   name: text("name").notNull(),
   slug: text("slug").unique().notNull(),
   shopName: text("shop_name"),
+  // Domaines des boutiques connectées — servent à router les webhooks entrants
+  // vers la bonne organisation (multi-tenant). Ex: "ma-boutique.myshopify.com".
+  shopifyDomain: text("shopify_domain").unique(),
+  wooDomain: text("woo_domain").unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -91,6 +96,13 @@ export const orders = pgTable(
   (table) => ({
     orgIdx: index("orders_org_idx").on(table.organizationId),
     statusIdx: index("orders_status_idx").on(table.status),
+    // Idempotence : une commande externe ne peut être insérée qu'une seule fois
+    // par organisation et par source (évite les doublons si le webhook est rejoué).
+    externalUnique: uniqueIndex("orders_external_unique_idx").on(
+      table.organizationId,
+      table.source,
+      table.externalId
+    ),
   })
 );
 

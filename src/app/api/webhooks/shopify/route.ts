@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { orders, organizations, users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { orders } from "@/lib/db/schema";
 import { verifyShopifyWebhook, isCashOnDelivery } from "@/lib/shopify/verify";
+import { resolveWebhookOrganization } from "@/lib/webhooks/tenant";
+import { triggerConfirmationCall } from "@/lib/webhooks/trigger-call";
 import { normalizePhoneNumber } from "@/lib/utils";
 
 interface ShopifyOrderPayload {
@@ -57,15 +58,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ received: true, action: "ignored_non_cod" });
     }
 
-    // Trouver l'organisation via le domaine Shopify (simplifié ici)
-    // En production, mapper shopDomain → organizationId via une table de configuration
-    const orgResult = await db.select().from(organizations).limit(1);
-    const organization = orgResult[0];
+    // Router la commande vers la bonne organisation via le domaine de la boutique.
+    const organization = await resolveWebhookOrganization("shopify", shopDomain);
 
     if (!organization) {
-      console.error("[shopify/webhook] Aucune organisation trouvée");
+      console.error(
+        `[shopify/webhook] Aucune organisation pour le domaine: ${shopDomain ?? "inconnu"}`
+      );
       return NextResponse.json(
-        { error: "Organisation introuvable" },
+        { error: "Organisation introuvable pour cette boutique" },
         { status: 404 }
       );
     }
@@ -113,7 +114,7 @@ export async function POST(req: Request) {
       .filter(Boolean)
       .join(", ");
 
-    // Insérer la commande
+    // Insérer la commande (idempotent : un rejeu du webhook ne crée pas de doublon)
     const insertedOrder = await db
       .insert(orders)
       .values({
@@ -126,29 +127,27 @@ export async function POST(req: Request) {
         totalAmount: payload.total_price,
         currency: payload.currency || "XOF",
         status: "pending",
-        rawPayload: payload as Record<string, unknown>,
+        rawPayload: payload as unknown as Record<string, unknown>,
+      })
+      .onConflictDoNothing({
+        target: [orders.organizationId, orders.source, orders.externalId],
       })
       .returning();
+
+    // Commande déjà traitée précédemment → on acquitte sans relancer d'appel.
+    if (!insertedOrder[0]) {
+      console.log(
+        `[shopify/webhook] Commande ${payload.id} déjà existante, ignorée (idempotence)`
+      );
+      return NextResponse.json({ received: true, action: "duplicate_ignored" });
+    }
 
     console.log(
       `[shopify/webhook] Commande COD créée: ${insertedOrder[0].id} pour ${customerName}`
     );
 
     // Déclencher l'appel de confirmation de manière asynchrone
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-    fetch(`${baseUrl}/api/calls/initiate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-internal-secret": process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
-      },
-      body: JSON.stringify({ orderId: insertedOrder[0].id }),
-    }).catch((err) => {
-      console.error(
-        `[shopify/webhook] Erreur déclenchement appel pour commande ${insertedOrder[0].id}:`,
-        err
-      );
-    });
+    triggerConfirmationCall(insertedOrder[0].id);
 
     return NextResponse.json({
       received: true,

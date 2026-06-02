@@ -42,24 +42,28 @@ function analyzeCallOutcome(
 ): "confirmed" | "cancelled" | "no_answer" {
   const combined = `${summary} ${transcript}`.toLowerCase();
 
+  // Signaux de fort niveau (peu ambigus) — on évite les mots trop génériques
+  // comme « non »/« oui » seuls qui apparaissent dans presque toutes les
+  // conversations et provoquent des faux positifs.
   const cancelKeywords = [
     "annul",
-    "annulé",
     "pas intéressé",
-    "non",
-    "refuse",
-    "ne veut pas",
     "n'est pas intéressé",
+    "ne veut pas",
+    "refuse",
+    "ne confirme pas",
+    "ne pas livrer",
+    "ne suis pas d'accord",
   ];
   const confirmKeywords = [
     "confirme",
     "confirmé",
-    "oui",
-    "d'accord",
-    "ok",
-    "parfait",
-    "livrer",
-    "disponible",
+    "je confirme",
+    "d'accord pour la livraison",
+    "c'est bon pour moi",
+    "livrez",
+    "vous pouvez livrer",
+    "je suis disponible",
   ];
   const noAnswerKeywords = [
     "pas de réponse",
@@ -67,13 +71,16 @@ function analyzeCallOutcome(
     "occupé",
     "voicemail",
     "no-answer",
+    "répondeur",
   ];
 
   if (noAnswerKeywords.some((kw) => combined.includes(kw))) return "no_answer";
   if (cancelKeywords.some((kw) => combined.includes(kw))) return "cancelled";
   if (confirmKeywords.some((kw) => combined.includes(kw))) return "confirmed";
 
-  return "confirmed"; // Par défaut si l'appel s'est terminé normalement
+  // Aucun signal clair : NE PAS auto-confirmer (risque financier en COD).
+  // On marque la commande pour un suivi manuel plutôt que de l'expédier.
+  return "no_answer";
 }
 
 export async function POST(req: Request) {
@@ -117,6 +124,15 @@ export async function POST(req: Request) {
       if (!dbCall) {
         console.error(`[vapi/webhook] Appel introuvable: ${call.id}`);
         return NextResponse.json({ error: "Appel introuvable" }, { status: 404 });
+      }
+
+      // Idempotence : Vapi peut rejouer ce rapport. Si l'appel a déjà été
+      // facturé (coût enregistré), on ne re-débite PAS le wallet.
+      if (dbCall.status === "completed" && dbCall.costFcfa !== null) {
+        console.log(
+          `[vapi/webhook] Rapport déjà traité pour ${call.id}, ignoré (idempotence)`
+        );
+        return NextResponse.json({ received: true, action: "already_processed" });
       }
 
       const costUsd = call.cost ?? 0;

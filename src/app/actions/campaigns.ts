@@ -4,8 +4,12 @@ import { createCampaignSchema } from "@/lib/validations/campaign";
 import { db } from "@/lib/db";
 import { campaigns, leads } from "@/lib/db/schema";
 import { getUserSession } from "@/lib/auth";
+import { normalizePhoneNumber } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
+
+// Plafond d'import par requête (évite les abus / payloads géants).
+const MAX_LEADS_PER_IMPORT = 5000;
 
 export async function createCampaignAction(formData: FormData) {
   const session = await getUserSession();
@@ -78,6 +82,15 @@ export async function importLeadsFromCsvAction(
   const session = await getUserSession();
   if (!session) return { error: "Non autorisé" };
 
+  if (!Array.isArray(leadsData) || leadsData.length === 0) {
+    return { error: "Aucun lead à importer." };
+  }
+  if (leadsData.length > MAX_LEADS_PER_IMPORT) {
+    return {
+      error: `Trop de leads (max ${MAX_LEADS_PER_IMPORT} par import).`,
+    };
+  }
+
   // Vérifier que la campagne appartient à l'organisation
   const campaign = await db.query.campaigns.findFirst({
     where: and(
@@ -88,27 +101,41 @@ export async function importLeadsFromCsvAction(
 
   if (!campaign) return { error: "Campagne introuvable." };
 
-  try {
-    const leadsToInsert = leadsData.map((lead) => ({
-      campaignId,
-      organizationId: session.organizationId,
-      name: lead.name,
-      phone: lead.phone,
-      company: lead.company,
-      email: lead.email,
-      status: "new" as const,
-    }));
+  // Validation/normalisation côté serveur : on ne fait pas confiance au client.
+  const sanitize = (v: string | undefined, max: number) =>
+    v?.toString().trim().slice(0, max) || undefined;
 
+  const leadsToInsert = leadsData
+    .map((lead) => {
+      const phone = normalizePhoneNumber(lead.phone ?? "", "TG");
+      if (!phone) return null; // numéro invalide → ignoré
+      return {
+        campaignId,
+        organizationId: session.organizationId,
+        name: sanitize(lead.name, 120),
+        phone,
+        company: sanitize(lead.company, 120),
+        email: sanitize(lead.email, 160),
+        status: "new" as const,
+      };
+    })
+    .filter((l): l is NonNullable<typeof l> => l !== null);
+
+  if (leadsToInsert.length === 0) {
+    return { error: "Aucun numéro de téléphone valide trouvé." };
+  }
+
+  try {
     await db.insert(leads).values(leadsToInsert);
 
-    // Mettre à jour le total des leads
+    // Incrément atomique du total des leads (par le nombre réellement inséré)
     await db
       .update(campaigns)
-      .set({ totalLeads: campaign.totalLeads + leadsData.length })
+      .set({ totalLeads: sql`${campaigns.totalLeads} + ${leadsToInsert.length}` })
       .where(eq(campaigns.id, campaignId));
 
     revalidatePath(`/dashboard/campaigns/${campaignId}`);
-    return { success: true, count: leadsData.length };
+    return { success: true, count: leadsToInsert.length };
   } catch (error) {
     console.error("[campaigns] Erreur import leads:", error);
     return { error: "Erreur lors de l'import des leads." };

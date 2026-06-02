@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { getUserSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { orders, calls } from "@/lib/db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { orders } from "@/lib/db/schema";
+import { eq, desc } from "drizzle-orm";
 import {
   Card,
   CardContent,
@@ -12,8 +11,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   ShoppingCart,
   CheckCircle,
@@ -21,9 +18,6 @@ import {
   Phone,
   Clock,
   AlertTriangle,
-  ExternalLink,
-  PhoneCall,
-  RefreshCw,
 } from "lucide-react";
 import { formatFcfa, getOrderStatusLabel } from "@/lib/utils";
 import { ManualCallButton } from "@/components/shared/manual-call-button";
@@ -66,9 +60,6 @@ export default async function EcommercePage() {
     .where(eq(orders.organizationId, session.organizationId))
     .orderBy(desc(orders.createdAt))
     .limit(50);
-
-  // Récupérer les derniers appels pour chaque commande
-  const orderIds = allOrders.map((o) => o.id);
 
   const stats = {
     total: allOrders.length,

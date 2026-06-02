@@ -1,4 +1,4 @@
-import VapiClient from "@vapi-ai/server-sdk";
+import { VapiClient, Vapi } from "@vapi-ai/server-sdk";
 
 let vapiInstance: VapiClient | null = null;
 
@@ -11,6 +11,20 @@ export function getVapiClient(): VapiClient {
     vapiInstance = new VapiClient({ token: apiKey });
   }
   return vapiInstance;
+}
+
+/**
+ * Crée un appel sortant via Vapi et renvoie l'objet `Call` typé.
+ *
+ * `calls.create` renvoie une union `Call | CallBatchResponse`. Comme nous
+ * créons toujours un appel unique (et non un batch), on restreint le type au
+ * `Call` afin d'accéder de façon sûre à `id`, `status`, etc.
+ */
+export async function createVapiCall(
+  request: Vapi.CreateCallDto
+): Promise<Vapi.Call> {
+  const response = await getVapiClient().calls.create(request);
+  return response as Vapi.Call;
 }
 
 /**

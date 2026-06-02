@@ -48,12 +48,3 @@ export async function requireSession(): Promise<UserSession> {
   }
   return session;
 }
-
-// Pour les API Routes (Request object)
-export async function checkAuthFromRequest(req: Request): Promise<UserSession | null> {
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader) return null;
-
-  // Utiliser le cookie de session depuis les headers
-  return getUserSession();
-}

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { db } from "@/lib/db";
-import { orders, organizations } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { orders } from "@/lib/db/schema";
+import { resolveWebhookOrganization } from "@/lib/webhooks/tenant";
+import { triggerConfirmationCall } from "@/lib/webhooks/trigger-call";
 import { normalizePhoneNumber } from "@/lib/utils";
 
 interface WooCommerceOrderPayload {
@@ -38,28 +39,42 @@ function verifyWooCommerceWebhook(
   if (!signature) return false;
 
   const secret = process.env.WOOCOMMERCE_WEBHOOK_SECRET;
-  if (!secret) return true; // Pas de secret configuré, accepter en dev
+  if (!secret) {
+    // Fail-closed en production : sans secret, on REJETTE (sinon n'importe qui
+    // pourrait forger des commandes). En dev on tolère pour faciliter les tests.
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "[woocommerce] WOOCOMMERCE_WEBHOOK_SECRET non configuré : webhook rejeté"
+      );
+      return false;
+    }
+    console.warn(
+      "[woocommerce] WOOCOMMERCE_WEBHOOK_SECRET absent (toléré hors production)"
+    );
+    return true;
+  }
 
   const computedHash = crypto
     .createHmac("sha256", secret)
     .update(rawBody, "utf8")
     .digest("base64");
 
+  const computedBuf = Buffer.from(computedHash);
+  const signatureBuf = Buffer.from(signature);
+  if (computedBuf.length !== signatureBuf.length) return false;
+
   try {
-    return crypto.timingSafeEqual(
-      Buffer.from(computedHash),
-      Buffer.from(signature)
-    );
+    return crypto.timingSafeEqual(computedBuf, signatureBuf);
   } catch {
     return false;
   }
 }
 
-function isWooCommerceCOD(paymentMethod: string): boolean {
+function isWooCommerceCOD(paymentMethod: string | undefined | null): boolean {
+  if (!paymentMethod) return false;
+  const value = paymentMethod.toLowerCase();
   const codMethods = ["cod", "cash_on_delivery", "paiement_livraison"];
-  return codMethods.some((m) =>
-    paymentMethod.toLowerCase().includes(m.toLowerCase())
-  );
+  return codMethods.some((m) => value.includes(m));
 }
 
 export async function POST(req: Request) {
@@ -67,6 +82,7 @@ export async function POST(req: Request) {
     const rawBody = await req.text();
     const signature = req.headers.get("x-wc-webhook-signature");
     const topic = req.headers.get("x-wc-webhook-topic");
+    const sourceDomain = req.headers.get("x-wc-webhook-source");
 
     if (!verifyWooCommerceWebhook(rawBody, signature)) {
       console.warn("[woocommerce/webhook] Signature invalide");
@@ -89,13 +105,18 @@ export async function POST(req: Request) {
       });
     }
 
-    // Chercher l'organisation (en production, associer via le domaine WooCommerce)
-    const orgResult = await db.select().from(organizations).limit(1);
-    const organization = orgResult[0];
+    // Router la commande vers la bonne organisation via le domaine du site.
+    const organization = await resolveWebhookOrganization(
+      "woocommerce",
+      sourceDomain
+    );
 
     if (!organization) {
+      console.error(
+        `[woocommerce/webhook] Aucune organisation pour la source: ${sourceDomain ?? "inconnue"}`
+      );
       return NextResponse.json(
-        { error: "Organisation introuvable" },
+        { error: "Organisation introuvable pour ce site" },
         { status: 404 }
       );
     }
@@ -147,29 +168,27 @@ export async function POST(req: Request) {
         totalAmount: payload.total,
         currency: payload.currency || "XOF",
         status: "pending",
-        rawPayload: payload as Record<string, unknown>,
+        rawPayload: payload as unknown as Record<string, unknown>,
+      })
+      .onConflictDoNothing({
+        target: [orders.organizationId, orders.source, orders.externalId],
       })
       .returning();
+
+    // Commande déjà traitée précédemment → on acquitte sans relancer d'appel.
+    if (!insertedOrder[0]) {
+      console.log(
+        `[woocommerce/webhook] Commande ${payload.id} déjà existante, ignorée (idempotence)`
+      );
+      return NextResponse.json({ received: true, action: "duplicate_ignored" });
+    }
 
     console.log(
       `[woocommerce/webhook] Commande COD créée: ${insertedOrder[0].id} pour ${customerName}`
     );
 
     // Déclencher l'appel de confirmation
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-    fetch(`${baseUrl}/api/calls/initiate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-internal-secret": process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
-      },
-      body: JSON.stringify({ orderId: insertedOrder[0].id }),
-    }).catch((err) => {
-      console.error(
-        `[woocommerce/webhook] Erreur déclenchement appel:`,
-        err
-      );
-    });
+    triggerConfirmationCall(insertedOrder[0].id);
 
     return NextResponse.json({
       received: true,

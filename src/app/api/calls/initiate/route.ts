@@ -3,20 +3,21 @@ import { db } from "@/lib/db";
 import { orders, calls, wallets, campaigns, leads, organizations } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import {
-  getVapiClient,
+  createVapiCall,
   generateEcommercePrompt,
   generateProspectingPrompt,
 } from "@/lib/vapi/client";
 import { hasSufficientBalance } from "@/lib/utils/billing";
 import { getUserSession } from "@/lib/auth";
+import { verifyInternalSecret } from "@/lib/webhooks/trigger-call";
 import { normalizePhoneNumber } from "@/lib/utils";
 
 export async function POST(req: Request) {
   try {
-    // Vérifier l'authentification (via session OU appel interne)
-    const internalSecret = req.headers.get("x-internal-secret");
-    const isInternalCall =
-      internalSecret === process.env.SUPABASE_SERVICE_ROLE_KEY;
+    // Vérifier l'authentification (via session OU appel interne signé)
+    const isInternalCall = verifyInternalSecret(
+      req.headers.get("x-internal-secret")
+    );
 
     if (isInternalCall) {
       // Appel depuis le webhook Shopify — récupérer l'org depuis la commande
@@ -97,6 +98,18 @@ async function initiateEcommerceCall(
   order: typeof orders.$inferSelect,
   organizationId: string
 ) {
+  // 0. Empêcher un double appel (idempotence) si la commande est déjà en cours
+  // d'appel ou déjà confirmée.
+  if (order.status === "calling" || order.status === "confirmed") {
+    return NextResponse.json(
+      {
+        error:
+          "Un appel est déjà en cours ou la commande est déjà confirmée.",
+      },
+      { status: 409 }
+    );
+  }
+
   // 1. Vérifier le solde du wallet
   const walletResult = await db
     .select()
@@ -133,10 +146,8 @@ async function initiateEcommerceCall(
   });
 
   try {
-    const vapi = getVapiClient();
-
     // 4. Lancer l'appel via Vapi
-    const callResponse = await vapi.calls.create({
+    const callResponse = await createVapiCall({
       phoneNumberId: process.env.VAPI_PHONE_NUMBER_ID!,
       customer: {
         number: order.customerPhone,
@@ -156,8 +167,8 @@ async function initiateEcommerceCall(
             process.env.ELEVENLABS_VOICE_ID ?? "EXAVITQu4vr4xnSDxMaL",
         },
         firstMessage: `Bonjour ${order.customerName}, c'est Amina de la boutique ${shopName}. Je vous appelle pour confirmer votre commande. Avez-vous quelques instants ?`,
-        endCallFunctionEnabled: true,
-        recordingEnabled: true,
+        maxDurationSeconds: 300,
+        artifactPlan: { recordingEnabled: true },
         transcriber: {
           provider: "deepgram",
           model: "nova-2",
@@ -266,9 +277,7 @@ async function initiateProspectingCall(
   });
 
   try {
-    const vapi = getVapiClient();
-
-    const callResponse = await vapi.calls.create({
+    const callResponse = await createVapiCall({
       phoneNumberId: process.env.VAPI_PHONE_NUMBER_ID!,
       customer: {
         number: phone,
@@ -290,8 +299,8 @@ async function initiateProspectingCall(
         firstMessage: lead.name
           ? `Bonjour ${lead.name}, comment allez-vous ?`
           : "Bonjour, comment allez-vous ?",
-        endCallFunctionEnabled: true,
-        recordingEnabled: true,
+        maxDurationSeconds: 300,
+        artifactPlan: { recordingEnabled: true },
         transcriber: {
           provider: "deepgram",
           model: "nova-2",

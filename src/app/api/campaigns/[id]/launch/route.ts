@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { getUserSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { campaigns, leads, calls, wallets } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { hasSufficientBalance } from "@/lib/utils/billing";
-import { getVapiClient, generateProspectingPrompt } from "@/lib/vapi/client";
+import { createVapiCall, generateProspectingPrompt } from "@/lib/vapi/client";
 import { normalizePhoneNumber } from "@/lib/utils";
 
 const BATCH_DELAY_MS = 2000; // 2 secondes entre chaque appel
@@ -89,7 +89,6 @@ export async function POST(
       });
     }
 
-    const vapi = getVapiClient();
     let launched = 0;
     const errors: string[] = [];
 
@@ -115,7 +114,7 @@ export async function POST(
           companyName: lead.company ?? undefined,
         });
 
-        const callResponse = await vapi.calls.create({
+        const callResponse = await createVapiCall({
           phoneNumberId: process.env.VAPI_PHONE_NUMBER_ID!,
           customer: {
             number: phone,
@@ -136,8 +135,8 @@ export async function POST(
             firstMessage: lead.name
               ? `Bonjour ${lead.name}, comment allez-vous ?`
               : "Bonjour, comment allez-vous ?",
-            endCallFunctionEnabled: true,
-            recordingEnabled: true,
+            maxDurationSeconds: 300,
+            artifactPlan: { recordingEnabled: true },
           },
         });
 
@@ -170,11 +169,13 @@ export async function POST(
       }
     }
 
-    // Mettre à jour les compteurs de la campagne
-    await db
-      .update(campaigns)
-      .set({ calledLeads: campaign.calledLeads + launched })
-      .where(eq(campaigns.id, campaignId));
+    // Mettre à jour les compteurs de la campagne (incrément atomique)
+    if (launched > 0) {
+      await db
+        .update(campaigns)
+        .set({ calledLeads: sql`${campaigns.calledLeads} + ${launched}` })
+        .where(eq(campaigns.id, campaignId));
+    }
 
     return NextResponse.json({
       launched,

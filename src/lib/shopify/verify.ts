@@ -20,14 +20,23 @@ export function verifyShopifyWebhook(
     .update(rawBody, "utf8")
     .digest("base64");
 
-  // Comparaison en temps constant pour éviter les timing attacks
-  return crypto.timingSafeEqual(
-    Buffer.from(computedHash),
-    Buffer.from(signature)
-  );
+  const computedBuf = Buffer.from(computedHash);
+  const signatureBuf = Buffer.from(signature);
+
+  // timingSafeEqual lève une exception si les longueurs diffèrent : on garde
+  // une comparaison en temps constant uniquement à longueur égale.
+  if (computedBuf.length !== signatureBuf.length) return false;
+
+  try {
+    return crypto.timingSafeEqual(computedBuf, signatureBuf);
+  } catch {
+    return false;
+  }
 }
 
-export function isCashOnDelivery(gateway: string): boolean {
+export function isCashOnDelivery(gateway: string | undefined | null): boolean {
+  if (!gateway) return false;
+  const value = gateway.toLowerCase();
   const codKeywords = [
     "cash on delivery",
     "cod",
@@ -35,5 +44,5 @@ export function isCashOnDelivery(gateway: string): boolean {
     "livraison",
     "cash",
   ];
-  return codKeywords.some((kw) => gateway.toLowerCase().includes(kw));
+  return codKeywords.some((kw) => value.includes(kw));
 }

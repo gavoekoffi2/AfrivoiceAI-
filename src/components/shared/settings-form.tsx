@@ -11,15 +11,21 @@ interface SettingsFormProps {
   organizationId: string;
   initialName: string;
   initialShopName: string;
+  initialShopifyDomain?: string;
+  initialWooDomain?: string;
 }
 
 export function SettingsForm({
   organizationId,
   initialName,
   initialShopName,
+  initialShopifyDomain = "",
+  initialWooDomain = "",
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
   const [shopName, setShopName] = useState(initialShopName);
+  const [shopifyDomain, setShopifyDomain] = useState(initialShopifyDomain);
+  const [wooDomain, setWooDomain] = useState(initialWooDomain);
   const [isPending, startTransition] = useTransition();
 
   function handleSave() {
@@ -28,7 +34,7 @@ export function SettingsForm({
         const res = await fetch("/api/settings", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, shopName }),
+          body: JSON.stringify({ name, shopName, shopifyDomain, wooDomain }),
         });
 
         const data = await res.json();
@@ -70,6 +76,30 @@ export function SettingsForm({
           />
           <p className="text-xs text-muted-foreground">
             Utilisé par l&apos;IA lors des appels de confirmation
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="shopifyDomain">Domaine Shopify</Label>
+          <Input
+            id="shopifyDomain"
+            value={shopifyDomain}
+            onChange={(e) => setShopifyDomain(e.target.value)}
+            placeholder="ma-boutique.myshopify.com"
+          />
+          <p className="text-xs text-muted-foreground">
+            Route les webhooks Shopify vers votre organisation
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="wooDomain">Domaine WooCommerce</Label>
+          <Input
+            id="wooDomain"
+            value={wooDomain}
+            onChange={(e) => setWooDomain(e.target.value)}
+            placeholder="ma-boutique.com"
+          />
+          <p className="text-xs text-muted-foreground">
+            Route les webhooks WooCommerce vers votre organisation
           </p>
         </div>
       </div>

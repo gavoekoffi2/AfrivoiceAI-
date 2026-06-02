@@ -13,6 +13,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
+    // Seuls les propriétaires/administrateurs peuvent créditer le wallet.
+    if (session.role !== "owner" && session.role !== "admin") {
+      return NextResponse.json(
+        { error: "Seul un administrateur peut recharger le wallet." },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     const validated = depositSchema.safeParse(body);
 
@@ -24,6 +32,24 @@ export async function POST(req: Request) {
     }
 
     const { amountFcfa, paymentMethod = "manual" } = validated.data;
+
+    // Garde-fou production : une recharge « manuelle » ne correspond à aucun
+    // paiement réel. On l'interdit en production tant qu'un fournisseur de
+    // paiement (Stripe / Mobile Money) n'est pas branché, sauf activation
+    // explicite via ALLOW_MANUAL_TOPUP=true.
+    if (
+      paymentMethod === "manual" &&
+      process.env.NODE_ENV === "production" &&
+      process.env.ALLOW_MANUAL_TOPUP !== "true"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Les recharges manuelles sont désactivées en production. Intégrez un fournisseur de paiement.",
+        },
+        { status: 403 }
+      );
+    }
 
     // Récupérer le wallet
     const walletResult = await db
