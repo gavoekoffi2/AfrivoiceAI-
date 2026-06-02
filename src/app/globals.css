@@ -73,4 +73,58 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Accessibilité : neutralise les animations si l'utilisateur le demande */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer utilities {
+  /* Dégradé "or → ambre" signature (confiance) + accent violet (tech) */
+  .text-gradient-gold {
+    @apply bg-gradient-to-br from-amber-200 via-amber-400 to-amber-500 bg-clip-text text-transparent;
+  }
+  .text-gradient-brand {
+    background-image: linear-gradient(110deg, #fde68a 0%, #f59e0b 40%, #a78bfa 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  /* Fond quadrillé subtil, atténué vers les bords */
+  .bg-grid {
+    background-image: theme("backgroundImage.grid-dark");
+    background-size: 56px 56px;
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+  }
+  /* Surface "verre" sombre */
+  .glass {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .glass-amber {
+    background: linear-gradient(180deg, rgba(245, 158, 11, 0.08), rgba(245, 158, 11, 0.02));
+    border: 1px solid rgba(245, 158, 11, 0.18);
+  }
+  .shadow-glow {
+    box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.12), 0 20px 60px -20px rgba(245, 158, 11, 0.35);
+  }
+  /* Masque de fondu horizontal (bandeau de logos) */
+  .mask-fade-x {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+  }
 }

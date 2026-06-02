@@ -3,18 +3,15 @@
 import { useTransition } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { PhoneCall } from "lucide-react";
+import { Loader2, CheckCircle2 } from "lucide-react";
 import { registerAction } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { AuthShell } from "@/components/landing/auth-shell";
+
+const fieldClass =
+  "border-white/10 bg-white/5 text-white placeholder:text-slate-500 focus-visible:ring-amber-400";
 
 export default function RegisterPage() {
   const [isPending, startTransition] = useTransition();
@@ -31,84 +28,78 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
-      <div className="w-full max-w-md space-y-6">
-        {/* Logo */}
-        <div className="flex flex-col items-center space-y-2 text-center">
-          <div className="flex items-center justify-center rounded-full bg-primary/10 p-3">
-            <PhoneCall className="h-8 w-8 text-primary" />
-          </div>
-          <h1 className="text-3xl font-bold text-white">AfrivoiceAI</h1>
-          <p className="text-slate-400">Commencez à automatiser vos appels dès aujourd&apos;hui</p>
+    <AuthShell
+      title="Créez votre compte"
+      subtitle="Lancez votre première campagne d'appels IA en quelques minutes."
+    >
+      <form action={handleSubmit} className="space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="organizationName" className="text-slate-300">
+            Nom de l&apos;entreprise
+          </Label>
+          <Input
+            id="organizationName"
+            name="organizationName"
+            type="text"
+            autoComplete="organization"
+            placeholder="Mon E-commerce Lomé"
+            required
+            className={fieldClass}
+          />
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="email" className="text-slate-300">
+            Adresse email
+          </Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            placeholder="vous@exemple.com"
+            required
+            className={fieldClass}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="password" className="text-slate-300">
+            Mot de passe
+          </Label>
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete="new-password"
+            placeholder="Au moins 8 caractères"
+            required
+            minLength={8}
+            className={fieldClass}
+          />
+        </div>
+        <Button
+          type="submit"
+          disabled={isPending}
+          className="w-full gap-2 bg-amber-500 font-semibold text-slate-950 hover:bg-amber-400"
+        >
+          {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+          {isPending ? "Création en cours…" : "Créer mon compte"}
+        </Button>
 
-        <Card className="border-slate-700 bg-slate-800/50 backdrop-blur">
-          <CardHeader>
-            <CardTitle className="text-white">Créer un compte</CardTitle>
-            <CardDescription className="text-slate-400">
-              Inscrivez votre entreprise sur AfrivoiceAI
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="organizationName" className="text-slate-300">
-                  Nom de l&apos;entreprise
-                </Label>
-                <Input
-                  id="organizationName"
-                  name="organizationName"
-                  type="text"
-                  placeholder="Mon E-commerce Lomé"
-                  required
-                  className="border-slate-600 bg-slate-700 text-white placeholder:text-slate-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-slate-300">
-                  Adresse email
-                </Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="vous@exemple.com"
-                  required
-                  className="border-slate-600 bg-slate-700 text-white placeholder:text-slate-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-slate-300">
-                  Mot de passe
-                </Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  placeholder="Au moins 8 caractères"
-                  required
-                  minLength={8}
-                  className="border-slate-600 bg-slate-700 text-white placeholder:text-slate-500"
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isPending}
-              >
-                {isPending ? "Création en cours..." : "Créer mon compte"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <p className="text-center text-sm text-slate-400">
-          Déjà un compte ?{" "}
-          <Link href="/login" className="text-primary hover:underline">
-            Se connecter
-          </Link>
+        <p className="flex items-center justify-center gap-1.5 text-xs text-slate-500">
+          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+          Sans carte bancaire · sans engagement
         </p>
-      </div>
-    </div>
+      </form>
+
+      <p className="mt-6 text-center text-sm text-slate-400">
+        Déjà un compte ?{" "}
+        <Link
+          href="/login"
+          className="font-medium text-amber-400 hover:text-amber-300"
+        >
+          Se connecter
+        </Link>
+      </p>
+    </AuthShell>
   );
 }

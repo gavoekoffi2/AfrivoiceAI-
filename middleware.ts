@@ -12,11 +12,16 @@ function isPublicApiRoute(pathname: string): boolean {
   );
 }
 
+/** La page d'accueil (landing marketing) est publique et statique. */
+function isPublicPage(pathname: string): boolean {
+  return pathname === "/";
+}
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   // Court-circuit : pas de dépendance à Supabase pour les routes publiques.
-  if (isPublicApiRoute(pathname)) {
+  if (isPublicApiRoute(pathname) || isPublicPage(pathname)) {
     return NextResponse.next();
   }
 
@@ -71,13 +76,6 @@ export async function middleware(request: NextRequest) {
   // Redirection des utilisateurs connectés loin des pages d'auth
   if ((pathname === "/login" || pathname === "/register") && user) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
-  // Redirection depuis la racine
-  if (pathname === "/") {
-    return NextResponse.redirect(
-      new URL(user ? "/dashboard" : "/login", request.url)
-    );
   }
 
   return supabaseResponse;
