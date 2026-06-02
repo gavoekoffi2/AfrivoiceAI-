@@ -40,3 +40,7 @@ next-env.d.ts
 
 # Local Netlify folder
 .netlify
+
+# Python (skills)
+__pycache__/
+*.pyc
