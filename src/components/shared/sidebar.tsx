@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -78,6 +79,7 @@ interface SidebarProps {
 
 export function Sidebar({ organizationName, userEmail }: SidebarProps) {
   const pathname = usePathname();
+  const reduce = useReducedMotion();
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -112,17 +114,28 @@ export function Sidebar({ organizationName, userEmail }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                 isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                  ? "text-sidebar-accent-foreground font-medium"
                   : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
               )}
             >
-              <item.icon className="h-4 w-4 shrink-0" />
-              <span>{item.title}</span>
+              {isActive &&
+                (reduce ? (
+                  <span className="absolute inset-0 rounded-lg bg-sidebar-accent" />
+                ) : (
+                  <motion.span
+                    layoutId="sidebar-active"
+                    className="absolute inset-0 rounded-lg bg-sidebar-accent"
+                    transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                  />
+                ))}
+              <item.icon className="relative z-10 h-4 w-4 shrink-0" />
+              <span className="relative z-10">{item.title}</span>
               {isActive && (
-                <ChevronRight className="ml-auto h-3 w-3 opacity-50" />
+                <ChevronRight className="relative z-10 ml-auto h-3 w-3 opacity-50" />
               )}
             </Link>
           );

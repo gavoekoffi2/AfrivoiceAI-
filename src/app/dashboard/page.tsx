@@ -22,8 +22,10 @@ import {
   getRecentCalls,
   getCallsChartData,
 } from "@/lib/db/queries";
-import { formatFcfa, formatDuration, getCallStatusLabel } from "@/lib/utils";
+import { formatDuration, getCallStatusLabel } from "@/lib/utils";
 import { CallsChart } from "@/components/shared/calls-chart";
+import { Reveal } from "@/components/landing/reveal";
+import { StatCounter } from "@/components/landing/stat-counter";
 import { redirect } from "next/navigation";
 
 export default async function DashboardOverview() {
@@ -39,7 +41,8 @@ export default async function DashboardOverview() {
   const kpiCards = [
     {
       title: "Appels Totaux",
-      value: stats.totalCalls.toLocaleString("fr-TG"),
+      to: stats.totalCalls,
+      suffix: "",
       description: "Tous les appels lancés",
       icon: PhoneCall,
       color: "text-blue-500",
@@ -47,7 +50,8 @@ export default async function DashboardOverview() {
     },
     {
       title: "Commandes Confirmées",
-      value: stats.confirmedOrders.toLocaleString("fr-TG"),
+      to: stats.confirmedOrders,
+      suffix: "",
       description: `Taux de succès : ${stats.confirmationRate}%`,
       icon: CheckCircle,
       color: "text-green-500",
@@ -55,7 +59,8 @@ export default async function DashboardOverview() {
     },
     {
       title: "Solde Wallet",
-      value: formatFcfa(stats.walletBalance),
+      to: stats.walletBalance,
+      suffix: " FCFA",
       description:
         stats.walletBalance < 5000 ? "Recharge recommandée" : "Solde disponible",
       icon: CreditCard,
@@ -67,7 +72,8 @@ export default async function DashboardOverview() {
     },
     {
       title: "Campagnes Actives",
-      value: stats.activeCampaigns.toLocaleString("fr-TG"),
+      to: stats.activeCampaigns,
+      suffix: "",
       description: "En cours d'exécution",
       icon: Activity,
       color: "text-orange-500",
@@ -100,30 +106,35 @@ export default async function DashboardOverview() {
 
       {/* Cartes KPI */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {kpiCards.map((card) => (
-          <Card key={card.title} className="relative overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {card.title}
-              </CardTitle>
-              <div className={`rounded-full p-2 ${card.bgColor}`}>
-                <card.icon className={`h-4 w-4 ${card.color}`} />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{card.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {card.description}
-              </p>
-            </CardContent>
-          </Card>
+        {kpiCards.map((card, i) => (
+          <Reveal key={card.title} delay={i * 0.07}>
+            <Card className="relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  {card.title}
+                </CardTitle>
+                <div className={`rounded-full p-2 ${card.bgColor}`}>
+                  <card.icon className={`h-4 w-4 ${card.color}`} />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  <StatCounter to={card.to} suffix={card.suffix} />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {card.description}
+                </p>
+              </CardContent>
+            </Card>
+          </Reveal>
         ))}
       </div>
 
       {/* Graphique + Appels récents */}
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Graphique des appels */}
-        <Card className="lg:col-span-2">
+        <Reveal delay={0.1} className="lg:col-span-2">
+          <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-primary" />
@@ -150,10 +161,12 @@ export default async function DashboardOverview() {
               </div>
             )}
           </CardContent>
-        </Card>
+          </Card>
+        </Reveal>
 
         {/* Appels récents */}
-        <Card>
+        <Reveal delay={0.18}>
+          <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5 text-primary" />
@@ -209,7 +222,8 @@ export default async function DashboardOverview() {
               </div>
             )}
           </CardContent>
-        </Card>
+          </Card>
+        </Reveal>
       </div>
     </div>
   );

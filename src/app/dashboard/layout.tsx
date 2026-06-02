@@ -3,6 +3,7 @@ import { getUserSession } from "@/lib/auth";
 import { getOrganizationStats } from "@/lib/db/queries";
 import { Sidebar } from "@/components/shared/sidebar";
 import { Header } from "@/components/shared/header";
+import { PageTransition } from "@/components/dashboard/page-transition";
 
 // Section authentifiée : dépend des cookies/DB, donc toujours rendue dynamiquement.
 export const dynamic = "force-dynamic";
@@ -37,7 +38,7 @@ export default async function DashboardLayout({
           walletBalance={stats.walletBalance}
         />
         <main className="flex-1 overflow-y-auto">
-          {children}
+          <PageTransition>{children}</PageTransition>
         </main>
       </div>
     </div>

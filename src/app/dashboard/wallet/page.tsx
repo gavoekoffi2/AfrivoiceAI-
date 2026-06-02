@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Wallet, ArrowUpCircle, ArrowDownCircle, Plus } from "lucide-react";
 import { formatFcfa } from "@/lib/utils";
 import { WalletDepositButton } from "@/components/shared/wallet-deposit-button";
+import { StatCounter } from "@/components/landing/stat-counter";
 import type { Transaction } from "@/lib/db/schema";
 
 export default async function WalletPage() {
@@ -44,7 +45,7 @@ export default async function WalletPage() {
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold text-primary">
-              {formatFcfa(balance)}
+              <StatCounter to={balance} suffix=" FCFA" />
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
               ≈ {(balance / 600).toFixed(2)} USD (taux : 1 USD = 600 FCFA)

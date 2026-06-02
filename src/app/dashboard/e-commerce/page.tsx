@@ -207,7 +207,7 @@ export default async function EcommercePage() {
                 return (
                   <div
                     key={order.id}
-                    className="flex items-center justify-between rounded-lg border p-3 hover:bg-accent/50 transition-colors"
+                    className="flex items-center justify-between rounded-lg border p-3 transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent/50 hover:shadow-sm"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 shrink-0">
