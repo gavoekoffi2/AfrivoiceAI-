@@ -21,30 +21,31 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_SITE_URL ?? "https://afrivoiceai-mvp.netlify.app"
   ),
   title: {
-    default: "AfrivoiceAI — L'IA vocale qui confirme vos commandes",
+    default: "AfrivoiceAI — L'IA vocale qui prospecte vos clients B2B",
     template: "%s · AfrivoiceAI",
   },
   description:
-    "AfrivoiceAI appelle automatiquement vos clients par IA vocale pour confirmer les commandes en paiement à la livraison et prospecter en B2B. Moins d'annulations, plus de livraisons réussies. Conçu pour l'Afrique, facturé en FCFA.",
+    "AfrivoiceAI lance des campagnes d'appels sortants par IA vocale : votre assistant appelle, qualifie et relance vos prospects B2B — et confirme aussi vos commandes COD. Conçu pour l'Afrique, facturé en FCFA, sans abonnement.",
   keywords: [
-    "voice AI",
+    "prospection téléphonique B2B",
+    "appels sortants IA",
     "IA vocale",
+    "voice AI",
+    "qualification de leads",
+    "centre d'appels IA",
     "Afrique",
-    "confirmation commande",
-    "paiement à la livraison",
-    "COD",
+    "confirmation commande COD",
     "Shopify",
     "WooCommerce",
-    "prospection",
     "Togo",
     "FCFA",
   ],
   openGraph: {
     type: "website",
     locale: "fr_FR",
-    title: "AfrivoiceAI — L'IA vocale qui confirme vos commandes",
+    title: "AfrivoiceAI — L'IA vocale qui prospecte vos clients B2B",
     description:
-      "Automatisez vos appels de confirmation COD et votre prospection B2B avec une IA vocale conçue pour l'Afrique.",
+      "Lancez des campagnes d'appels de prospection B2B par IA vocale : qualification, relance et confirmation COD. Conçu pour l'Afrique.",
     siteName: "AfrivoiceAI",
   },
 };
