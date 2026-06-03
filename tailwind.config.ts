@@ -112,6 +112,15 @@ const config: Config = {
           "0%, 100%": { transform: "scaleY(0.35)" },
           "50%": { transform: "scaleY(1)" },
         },
+        "gradient-x": {
+          "0%, 100%": { backgroundPosition: "0% 50%" },
+          "50%": { backgroundPosition: "100% 50%" },
+        },
+        drift: {
+          "0%, 100%": { transform: "translate(0,0) scale(1)" },
+          "33%": { transform: "translate(5%,-6%) scale(1.12)" },
+          "66%": { transform: "translate(-5%,4%) scale(0.94)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -122,6 +131,8 @@ const config: Config = {
         "glow-pulse": "glow-pulse 4s ease-in-out infinite",
         "spin-slow": "spin-slow 22s linear infinite",
         "sound-bar": "sound-bar 0.9s ease-in-out infinite",
+        "gradient-x": "gradient-x 8s ease infinite",
+        drift: "drift 26s ease-in-out infinite",
       },
     },
   },

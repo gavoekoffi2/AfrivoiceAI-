@@ -18,7 +18,8 @@ interface RevealProps {
 
 /**
  * Révèle son contenu à l'entrée dans le viewport (une seule fois).
- * Respecte `prefers-reduced-motion` (aucun mouvement si demandé).
+ * Sous prefers-reduced-motion : on conserve un fondu d'opacité (sans
+ * translation) — accessible, mais le contenu reste vivant à l'apparition.
  */
 export function Reveal({
   children,
@@ -29,17 +30,13 @@ export function Reveal({
 }: RevealProps) {
   const reduce = useReducedMotion();
 
-  if (reduce) {
-    return <div className={className}>{children}</div>;
-  }
-
   return (
     <motion.div
       className={className}
-      initial={{ opacity: 0, y }}
+      initial={{ opacity: 0, y: reduce ? 0 : y }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "0px 0px -12% 0px" }}
-      transition={{ duration, delay, ease: EASE }}
+      transition={{ duration: reduce ? 0.5 : duration, delay, ease: EASE }}
     >
       {children}
     </motion.div>

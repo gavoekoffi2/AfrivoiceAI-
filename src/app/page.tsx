@@ -23,9 +23,16 @@ import {
 } from "lucide-react";
 import { LandingNav } from "@/components/landing/landing-nav";
 import { Aurora } from "@/components/landing/aurora";
+import { ParticleField } from "@/components/landing/particle-field";
 import { CallMockup } from "@/components/landing/call-mockup";
+import { ProspectingConsole } from "@/components/landing/prospecting-console";
 import { Reveal } from "@/components/landing/reveal";
 import { StatCounter } from "@/components/landing/stat-counter";
+import {
+  ScrollProgress,
+  Magnetic,
+  PointerParallax,
+} from "@/components/landing/motion-fx";
 
 const INTEGRATIONS = [
   "Shopify",
@@ -38,34 +45,34 @@ const INTEGRATIONS = [
 
 const FEATURES = [
   {
-    icon: ShoppingCart,
-    title: "Confirmation COD automatique",
-    desc: "Chaque commande Shopify/WooCommerce déclenche un appel IA qui confirme l'achat, l'adresse et le créneau de livraison.",
-    tint: "text-amber-400 bg-amber-500/10 ring-amber-400/20",
-  },
-  {
     icon: Megaphone,
-    title: "Prospection B2B",
-    desc: "Importez vos leads (CSV), définissez un script, et lancez des campagnes d'appels sortants qualifiés à grande échelle.",
+    title: "Prospection téléphonique B2B",
+    desc: "Importez vos leads (CSV), définissez un script, et lancez des campagnes d'appels sortants. L'IA appelle, qualifie et relance des centaines de prospects en parallèle.",
     tint: "text-violet-300 bg-violet-500/10 ring-violet-400/20",
   },
   {
     icon: FileText,
-    title: "Transcription & résumé IA",
-    desc: "Chaque appel est enregistré, transcrit et résumé. Retrouvez l'essentiel en un coup d'œil dans le tableau de bord.",
+    title: "Qualification & résumé IA",
+    desc: "Chaque appel est enregistré, transcrit et résumé. Vous récupérez l'intérêt, les objections et les rendez-vous, prêts à exploiter.",
     tint: "text-sky-300 bg-sky-500/10 ring-sky-400/20",
-  },
-  {
-    icon: Wallet,
-    title: "Wallet en FCFA",
-    desc: "Pas d'abonnement. Vous rechargez votre solde et payez à l'usage, avec une tarification transparente, à la seconde près.",
-    tint: "text-emerald-300 bg-emerald-500/10 ring-emerald-400/20",
   },
   {
     icon: BarChart3,
     title: "Issue d'appel fiable",
-    desc: "Une analyse déterministe classe chaque appel : confirmée, annulée ou sans réponse. Aucune commande expédiée par erreur.",
+    desc: "Une analyse déterministe classe chaque appel : qualifié, à rappeler ou pas intéressé. Vos commerciaux ne traitent que les leads chauds.",
     tint: "text-rose-300 bg-rose-500/10 ring-rose-400/20",
+  },
+  {
+    icon: ShoppingCart,
+    title: "Confirmation COD (bonus)",
+    desc: "Aussi en e-commerce : chaque commande Shopify/WooCommerce déclenche un appel IA qui confirme l'achat, l'adresse et le créneau de livraison.",
+    tint: "text-amber-400 bg-amber-500/10 ring-amber-400/20",
+  },
+  {
+    icon: Wallet,
+    title: "Wallet en FCFA",
+    desc: "Pas d'abonnement. Vous rechargez votre solde et payez à l'usage, à la seconde près, avec une tarification transparente.",
+    tint: "text-emerald-300 bg-emerald-500/10 ring-emerald-400/20",
   },
   {
     icon: Languages,
@@ -78,36 +85,36 @@ const FEATURES = [
 const STEPS = [
   {
     icon: Plug,
-    title: "1 · Connectez votre boutique",
-    desc: "Branchez Shopify ou WooCommerce en collant une URL de webhook. Aucune ligne de code.",
+    title: "1 · Importez vos leads",
+    desc: "Chargez votre liste de prospects (CSV) et choisissez le script d'appel. Aucune ligne de code.",
   },
   {
     icon: PhoneCall,
-    title: "2 · L'IA appelle vos clients",
-    desc: "Dès qu'une commande arrive, Amina, votre assistante vocale, appelle en quelques secondes pour la confirmer.",
+    title: "2 · L'IA lance les appels",
+    desc: "Amina appelle vos prospects en parallèle, présente votre offre, répond aux questions et qualifie l'intérêt.",
   },
   {
     icon: CheckCircle2,
-    title: "3 · Vous livrez sereinement",
-    desc: "Statut, transcription et résumé apparaissent en temps réel. Vous n'expédiez que des commandes confirmées.",
+    title: "3 · Récupérez les leads chauds",
+    desc: "Statut, transcription et résumé en temps réel. Vos commerciaux se concentrent sur les prospects qualifiés.",
   },
 ];
 
 const PERSONAS = [
   {
-    icon: Store,
-    title: "E-commerçants COD",
-    desc: "Réduisez les colis retournés et les livraisons à vide en confirmant chaque commande avant l'expédition.",
-  },
-  {
     icon: Building2,
     title: "PME & équipes commerciales",
-    desc: "Qualifiez des centaines de prospects par IA et concentrez vos commerciaux sur les leads chauds.",
+    desc: "Qualifiez des centaines de prospects par IA et concentrez vos commerciaux sur les leads réellement chauds.",
   },
   {
     icon: Headphones,
-    title: "Agences & dropshippers",
-    desc: "Gérez plusieurs boutiques, automatisez le service client sortant et facturez la valeur à vos clients.",
+    title: "Agences & centres d'appels",
+    desc: "Démultipliez vos campagnes sortantes, gérez plusieurs comptes et facturez la valeur à vos clients.",
+  },
+  {
+    icon: Store,
+    title: "E-commerçants COD",
+    desc: "En bonus, confirmez chaque commande en paiement à la livraison avant l'expédition pour réduire les retours.",
   },
 ];
 
@@ -122,11 +129,11 @@ const FAQ = [
   },
   {
     q: "Avec quels outils est-ce compatible ?",
-    a: "Shopify et WooCommerce pour l'e-commerce (via webhooks), et un import CSV pour la prospection. La voix et la conversation s'appuient sur Vapi, ElevenLabs, Deepgram et Google Gemini.",
+    a: "Un simple import CSV pour la prospection, et Shopify / WooCommerce pour l'e-commerce (via webhooks). La voix et la conversation s'appuient sur Vapi, ElevenLabs, Deepgram et Google Gemini.",
   },
   {
-    q: "Comment l'IA décide-t-elle qu'une commande est confirmée ?",
-    a: "Chaque appel est analysé de façon structurée et classé en « confirmée », « annulée » ou « sans réponse ». En cas de doute, la commande n'est jamais confirmée automatiquement — vous évitez les expéditions inutiles.",
+    q: "Comment l'IA qualifie-t-elle un prospect ?",
+    a: "Chaque appel est analysé de façon structurée et classé : « qualifié », « à rappeler » ou « pas intéressé », avec un résumé et les objections. Vos commerciaux ne rappellent que les leads chauds. En e-commerce, le même moteur confirme ou non les commandes COD.",
   },
   {
     q: "Mes données sont-elles en sécurité ?",
@@ -169,53 +176,62 @@ function SectionHeading({
 export default function LandingPage() {
   return (
     <div className="min-h-dvh overflow-x-hidden bg-slate-950 font-sans text-slate-100 selection:bg-amber-400/30">
+      <ScrollProgress />
       <LandingNav />
 
       {/* ============================= HERO ============================= */}
       <section className="relative isolate pt-32 pb-20 sm:pt-40 sm:pb-28">
-        <Aurora className="[mask-image:linear-gradient(to_bottom,black,transparent)]" />
-        <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-14 px-4 sm:px-6 lg:grid-cols-2 lg:gap-10 lg:px-8">
+        <Aurora className="-z-10 [mask-image:linear-gradient(to_bottom,black,transparent)]" />
+        <ParticleField className="-z-10 [mask-image:linear-gradient(to_bottom,black,transparent)]" />
+        <div className="relative z-10 mx-auto grid max-w-7xl grid-cols-1 items-center gap-14 px-4 sm:px-6 lg:grid-cols-2 lg:gap-10 lg:px-8">
           {/* Colonne texte */}
           <div className="text-center lg:text-left">
             <Reveal>
               <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1.5 text-xs font-medium text-slate-300">
                 <Sparkles className="h-3.5 w-3.5 text-amber-400" />
-                Voice AI conçue pour l&apos;Afrique
+                Prospection téléphonique B2B · IA vocale
               </span>
             </Reveal>
 
             <Reveal delay={0.06}>
               <h1 className="mt-6 text-balance font-display text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-6xl lg:text-[4.2rem]">
-                Moins d&apos;annulations.{" "}
-                <span className="text-gradient-brand">Plus de livraisons.</span>{" "}
-                Zéro appel manuel.
+                L&apos;IA vocale qui{" "}
+                <span className="text-gradient-brand animate-gradient-x">
+                  prospecte vos clients
+                </span>{" "}
+                pendant que vous vendez.
               </h1>
             </Reveal>
 
             <Reveal delay={0.12}>
               <p className="mx-auto mt-6 max-w-xl text-pretty text-lg leading-relaxed text-slate-300 lg:mx-0">
-                AfrivoiceAI appelle automatiquement chaque client par IA vocale
-                pour confirmer les commandes en paiement à la livraison — et
-                relance vos prospects B2B. Facturé en FCFA, sans abonnement.
+                Lancez des campagnes d&apos;appels sortants : votre assistant
+                vocal appelle, qualifie et relance vos prospects B2B en continu —
+                et confirme aussi vos commandes COD. Facturé en FCFA, sans
+                abonnement.
               </p>
             </Reveal>
 
             <Reveal delay={0.18}>
               <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row lg:justify-start">
-                <Link
-                  href="/register"
-                  className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-6 py-3.5 text-base font-semibold text-slate-950 shadow-glow transition-all hover:bg-amber-400 sm:w-auto"
-                >
-                  Commencer gratuitement
-                  <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
-                </Link>
-                <a
-                  href="#demo"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.03] px-6 py-3.5 text-base font-medium text-white transition-colors hover:bg-white/[0.07] sm:w-auto"
-                >
-                  <PhoneCall className="h-5 w-5 text-amber-400" />
-                  Voir la démo
-                </a>
+                <Magnetic className="w-full sm:w-auto">
+                  <Link
+                    href="/register"
+                    className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-6 py-3.5 text-base font-semibold text-slate-950 shadow-glow transition-all hover:bg-amber-400 sm:w-auto"
+                  >
+                    Commencer gratuitement
+                    <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                </Magnetic>
+                <Magnetic className="w-full sm:w-auto">
+                  <a
+                    href="#demo"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.03] px-6 py-3.5 text-base font-medium text-white transition-colors hover:bg-white/[0.07] sm:w-auto"
+                  >
+                    <PhoneCall className="h-5 w-5 text-amber-400" />
+                    Voir la démo
+                  </a>
+                </Magnetic>
               </div>
             </Reveal>
 
@@ -226,8 +242,8 @@ export default function LandingPage() {
                   carte bancaire
                 </span>
                 <span className="inline-flex items-center gap-1.5">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Shopify
-                  &amp; WooCommerce
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Import CSV
+                  de leads
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Paiement
@@ -239,7 +255,9 @@ export default function LandingPage() {
 
           {/* Colonne visuel animé */}
           <Reveal delay={0.2} y={32} className="flex justify-center lg:justify-end">
-            <CallMockup />
+            <PointerParallax strength={14}>
+              <ProspectingConsole />
+            </PointerParallax>
           </Reveal>
         </div>
       </section>
@@ -282,31 +300,33 @@ export default function LandingPage() {
       <section className="relative py-20 sm:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <SectionHeading
-            eyebrow="Le vrai coût du COD"
+            eyebrow="Le coût de la prospection"
             title={
               <>
-                Le paiement à la livraison vous fait{" "}
-                <span className="text-gradient-gold">perdre de l&apos;argent</span>
+                La prospection téléphonique manuelle{" "}
+                <span className="text-gradient-gold">
+                  ne passe pas à l&apos;échelle
+                </span>
               </>
             }
-            desc="En Afrique, une commande sur deux peut être annulée, injoignable ou refusée à la livraison. Chaque colis retourné, c'est du transport, du stock immobilisé et du temps perdu."
+            desc="Recruter, former et payer des commerciaux pour appeler à froid coûte cher — et la majorité des appels n'aboutissent jamais. Vos meilleurs vendeurs passent leurs journées à composer des numéros."
           />
           <div className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-3">
             {[
               {
                 icon: PhoneOff,
-                stat: "Jusqu'à 40 %",
-                label: "de commandes COD annulées ou injoignables sans confirmation préalable.",
+                stat: "8 appels sur 10",
+                label: "n'aboutissent pas : messagerie, faux numéros ou refus immédiat.",
               },
               {
                 icon: TrendingDown,
-                stat: "Marges érodées",
-                label: "par les frais de livraison aller-retour des colis non confirmés.",
+                stat: "Coût par lead élevé",
+                label: "salaires, primes et temps passé à prospecter à la main, sans garantie de résultat.",
               },
               {
                 icon: Clock,
                 stat: "Des heures perdues",
-                label: "à appeler manuellement chaque client, un par un, sans garantie de réponse.",
+                label: "à composer, relancer et noter chaque appel, un prospect à la fois.",
               },
             ].map((item, i) => (
               <Reveal key={item.stat} delay={i * 0.08}>
@@ -332,8 +352,8 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <SectionHeading
             eyebrow="Comment ça marche"
-            title="Confirmé en 3 étapes, sans effort"
-            desc="De la commande à la livraison, AfrivoiceAI s'occupe de l'appel pendant que vous vous concentrez sur votre business."
+            title="De votre liste aux leads chauds, en 3 étapes"
+            desc="Vous importez vos prospects, l'IA passe les appels et qualifie l'intérêt pendant que vous vous concentrez sur la vente."
           />
           <div className="relative mt-16">
             <div
@@ -376,21 +396,21 @@ export default function LandingPage() {
             </Reveal>
             <Reveal delay={0.05}>
               <h2 className="mt-5 font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                Écoutez votre IA confirmer une commande,{" "}
+                Écoutez votre IA qualifier un prospect,{" "}
                 <span className="text-gradient-gold">en direct</span>
               </h2>
             </Reveal>
             <Reveal delay={0.1}>
               <p className="mt-4 text-lg leading-relaxed text-slate-400">
-                Une voix naturelle, un ton chaleureux, une conversation qui va
-                droit au but. Voici ce que vos clients entendent.
+                Une voix naturelle, un ton professionnel, une conversation qui va
+                droit au but. Voici ce que vos prospects entendent.
               </p>
             </Reveal>
             <div className="mt-8 space-y-4">
               {[
-                "Se présente au nom de votre boutique",
-                "Vérifie l'identité, le montant et l'adresse",
-                "Confirme le créneau de livraison",
+                "Se présente au nom de votre entreprise",
+                "Présente l'offre et répond aux objections",
+                "Décroche un rendez-vous ou qualifie l'intérêt",
                 "Met à jour le statut et la transcription automatiquement",
               ].map((point, i) => (
                 <Reveal key={point} delay={0.15 + i * 0.07}>
@@ -401,9 +421,17 @@ export default function LandingPage() {
                 </Reveal>
               ))}
             </div>
+            <Reveal delay={0.45}>
+              <p className="mt-6 text-sm text-slate-500">
+                Le même moteur confirme aussi vos commandes COD Shopify &amp;
+                WooCommerce.
+              </p>
+            </Reveal>
           </div>
           <Reveal delay={0.15} y={32} className="flex justify-center lg:justify-end">
-            <CallMockup />
+            <PointerParallax strength={12}>
+              <CallMockup />
+            </PointerParallax>
           </Reveal>
         </div>
       </section>
@@ -415,11 +443,11 @@ export default function LandingPage() {
             eyebrow="Fonctionnalités"
             title={
               <>
-                Tout pour automatiser{" "}
-                <span className="text-gradient-gold">vos appels</span>
+                Tout pour prospecter{" "}
+                <span className="text-gradient-gold">à grande échelle</span>
               </>
             }
-            desc="Une plateforme complète : confirmation de commandes, prospection, facturation et analytics, pensée pour les réalités du terrain."
+            desc="Campagnes d'appels sortants, qualification IA, facturation et analytics — et la confirmation de commandes COD en bonus."
           />
           <div className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map((f, i) => (
@@ -448,10 +476,26 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 gap-8 rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.04] to-transparent p-10 sm:grid-cols-4">
             {[
-              { to: 30, suffix: " s", label: "pour lancer un appel après la commande" },
-              { to: 3, suffix: "×", label: "plus de commandes confirmées qu'en manuel" },
-              { to: 24, suffix: "/7", label: "des appels qui ne dorment jamais" },
-              { to: 100, suffix: " %", label: "automatique, du webhook au statut final" },
+              {
+                to: 300,
+                suffix: "+",
+                label: "appels de prospection par jour et par campagne",
+              },
+              {
+                to: 3,
+                suffix: "×",
+                label: "plus de leads qualifiés qu'en prospection manuelle",
+              },
+              {
+                to: 24,
+                suffix: "/7",
+                label: "des appels sortants qui ne dorment jamais",
+              },
+              {
+                to: 100,
+                suffix: " %",
+                label: "automatique, de l'import CSV au lead qualifié",
+              },
             ].map((s, i) => (
               <Reveal key={s.label} delay={i * 0.08} className="text-center">
                 <p className="font-display text-4xl font-bold text-gradient-gold sm:text-5xl">
@@ -476,7 +520,7 @@ export default function LandingPage() {
           <div className="mt-14 grid grid-cols-1 gap-5 md:grid-cols-3">
             {PERSONAS.map((p, i) => (
               <Reveal key={p.title} delay={i * 0.1}>
-                <div className="h-full rounded-2xl border border-white/10 bg-white/[0.03] p-7">
+                <div className="h-full rounded-2xl border border-white/10 bg-white/[0.03] p-7 transition-all duration-300 hover:-translate-y-1 hover:border-amber-400/30 hover:bg-white/[0.05]">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400 ring-1 ring-amber-400/20">
                     <p.icon className="h-6 w-6" />
                   </div>
@@ -517,14 +561,14 @@ export default function LandingPage() {
                   <span className="text-slate-400">FCFA / minute d&apos;appel</span>
                 </div>
                 <p className="mt-2 text-sm text-slate-400">
-                  Estimation pour un appel de confirmation typique. Vous ne payez
-                  que les appels réellement passés.
+                  Estimation pour un appel typique. Vous ne payez que les appels
+                  réellement passés.
                 </p>
                 <ul className="mt-6 space-y-3 text-sm">
                   {[
-                    "Confirmation COD + prospection B2B",
+                    "Prospection B2B + confirmation COD",
                     "Transcriptions, résumés & enregistrements",
-                    "Intégrations Shopify & WooCommerce",
+                    "Import CSV & intégrations Shopify / WooCommerce",
                     "Tableau de bord & analytics en temps réel",
                     "Wallet rechargeable, sans engagement",
                   ].map((f) => (
@@ -562,7 +606,7 @@ export default function LandingPage() {
                   {[
                     "Tarif dégressif au volume",
                     "Voix & langues locales sur demande",
-                    "Multi-boutiques & multi-équipes",
+                    "Multi-comptes & multi-équipes",
                     "Support prioritaire dédié",
                   ].map((f) => (
                     <li key={f} className="flex items-start gap-2.5 text-slate-200">
@@ -617,7 +661,7 @@ export default function LandingPage() {
             </Reveal>
             <Reveal delay={0.05}>
               <h2 className="mx-auto mt-5 max-w-2xl text-balance font-display text-3xl font-bold tracking-tight text-white sm:text-5xl">
-                Prêt à confirmer plus de commandes&nbsp;?
+                Prêt à remplir votre pipeline&nbsp;?
               </h2>
             </Reveal>
             <Reveal delay={0.1}>
@@ -628,13 +672,15 @@ export default function LandingPage() {
             </Reveal>
             <Reveal delay={0.16}>
               <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <Link
-                  href="/register"
-                  className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-7 py-4 text-base font-semibold text-slate-950 shadow-glow transition-all hover:bg-amber-400 sm:w-auto"
-                >
-                  Commencer gratuitement
-                  <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
-                </Link>
+                <Magnetic className="w-full sm:w-auto">
+                  <Link
+                    href="/register"
+                    className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-7 py-4 text-base font-semibold text-slate-950 shadow-glow transition-all hover:bg-amber-400 sm:w-auto"
+                  >
+                    Commencer gratuitement
+                    <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                </Magnetic>
                 <Link
                   href="/login"
                   className="inline-flex w-full items-center justify-center rounded-xl border border-white/15 px-7 py-4 text-base font-medium text-white transition-colors hover:bg-white/[0.07] sm:w-auto"

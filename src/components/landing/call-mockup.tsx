@@ -2,21 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import {
-  PhoneCall,
-  Check,
-  ShieldCheck,
-  MapPin,
-  ShoppingBag,
-} from "lucide-react";
+import { PhoneCall, ShieldCheck, Building2, CalendarCheck } from "lucide-react";
 
 type Speaker = "ai" | "client";
 const SCRIPT: { from: Speaker; text: string }[] = [
-  { from: "ai", text: "Bonjour Awa, c'est Amina de la boutique Kossi Mode. Je vous appelle pour confirmer votre commande." },
-  { from: "client", text: "Oui bonjour, c'est bien moi." },
-  { from: "ai", text: "Votre commande de 24 900 FCFA, livrée à Lomé (Tokoin). C'est correct ?" },
-  { from: "client", text: "Oui c'est exact, je serai disponible demain." },
-  { from: "ai", text: "Parfait, votre commande est confirmée. Livraison demain. Excellente journée !" },
+  {
+    from: "ai",
+    text: "Bonjour M. Mensah, Amina d'AfrivoiceAI. Je vous appelle au sujet de vos campagnes d'appels commerciaux.",
+  },
+  { from: "client", text: "Bonjour, oui je vous écoute." },
+  {
+    from: "ai",
+    text: "On qualifie vos prospects par IA, à grande échelle. Auriez-vous 15 min jeudi pour une démo ?",
+  },
+  { from: "client", text: "Jeudi en fin d'après-midi, ça me convient." },
+  {
+    from: "ai",
+    text: "Parfait, je bloque jeudi 17h et vous envoie l'invitation. Excellente journée !",
+  },
 ];
 
 const STEP_MS = 1500;
@@ -36,30 +39,35 @@ function Waveform() {
   );
 }
 
+/**
+ * Maquette d'appel animée : l'IA "Amina" qualifie un prospect B2B en direct,
+ * message après message, jusqu'à décrocher un rendez-vous. Boucle en continu.
+ * Statique sous prefers-reduced-motion.
+ */
 export function CallMockup() {
   const reduce = useReducedMotion();
   const [visible, setVisible] = useState(reduce ? SCRIPT.length : 0);
-  const [confirmed, setConfirmed] = useState(reduce);
+  const [done, setDone] = useState(reduce);
 
   useEffect(() => {
     if (reduce) {
       setVisible(SCRIPT.length);
-      setConfirmed(true);
+      setDone(true);
       return;
     }
     let cancelled = false;
     const timers: ReturnType<typeof setTimeout>[] = [];
     const run = () => {
       setVisible(0);
-      setConfirmed(false);
+      setDone(false);
       SCRIPT.forEach((_, i) => {
         timers.push(
           setTimeout(() => !cancelled && setVisible(i + 1), START_MS + i * STEP_MS)
         );
       });
-      const confirmAt = START_MS + SCRIPT.length * STEP_MS + 300;
-      timers.push(setTimeout(() => !cancelled && setConfirmed(true), confirmAt));
-      timers.push(setTimeout(() => !cancelled && run(), confirmAt + 3400));
+      const doneAt = START_MS + SCRIPT.length * STEP_MS + 300;
+      timers.push(setTimeout(() => !cancelled && setDone(true), doneAt));
+      timers.push(setTimeout(() => !cancelled && run(), doneAt + 3400));
     };
     run();
     return () => {
@@ -88,7 +96,7 @@ export function CallMockup() {
             </p>
             <p className="flex items-center gap-1.5 text-xs text-emerald-300">
               <span className="inline-block h-1.5 w-1.5 animate-glow-pulse rounded-full bg-emerald-400" />
-              Appel en cours
+              Appel sortant en cours
             </p>
           </div>
           <Waveform />
@@ -117,22 +125,22 @@ export function CallMockup() {
           ))}
         </div>
 
-        {/* Carte commande + statut */}
+        {/* Carte prospect + statut */}
         <div className="border-t border-white/10 bg-white/[0.03] px-5 py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/15 text-violet-300">
-                <ShoppingBag className="h-4 w-4" />
+                <Building2 className="h-4 w-4" />
               </div>
               <div>
-                <p className="text-sm font-medium text-white">Commande #4821</p>
-                <p className="flex items-center gap-1 text-xs text-slate-400">
-                  <MapPin className="h-3 w-3" /> Lomé · 24 900 FCFA
+                <p className="text-sm font-medium text-white">Yao Mensah</p>
+                <p className="text-xs text-slate-400">
+                  Atlantic Logistics · Prospect B2B
                 </p>
               </div>
             </div>
             <AnimatePresence mode="wait">
-              {confirmed ? (
+              {done ? (
                 <motion.span
                   key="ok"
                   initial={reduce ? false : { scale: 0.6, opacity: 0 }}
@@ -140,7 +148,7 @@ export function CallMockup() {
                   transition={{ type: "spring", stiffness: 500, damping: 22 }}
                   className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-400/30"
                 >
-                  <Check className="h-3.5 w-3.5" /> Confirmée
+                  <CalendarCheck className="h-3.5 w-3.5" /> Qualifié · RDV jeudi
                 </motion.span>
               ) : (
                 <motion.span
@@ -150,7 +158,7 @@ export function CallMockup() {
                   className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-300 ring-1 ring-amber-400/20"
                 >
                   <span className="h-1.5 w-1.5 animate-glow-pulse rounded-full bg-amber-400" />
-                  En cours…
+                  Qualification…
                 </motion.span>
               )}
             </AnimatePresence>
