@@ -1,4 +1,4 @@
-import VapiClient from "@vapi-ai/server-sdk";
+import { VapiClient } from "@vapi-ai/server-sdk/Client";
 
 let vapiInstance: VapiClient | null = null;
 

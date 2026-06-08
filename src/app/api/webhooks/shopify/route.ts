@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { orders, organizations, users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { orders, organizations } from "@/lib/db/schema";
 import { verifyShopifyWebhook, isCashOnDelivery } from "@/lib/shopify/verify";
 import { normalizePhoneNumber } from "@/lib/utils";
 
@@ -126,7 +125,7 @@ export async function POST(req: Request) {
         totalAmount: payload.total_price,
         currency: payload.currency || "XOF",
         status: "pending",
-        rawPayload: payload as Record<string, unknown>,
+        rawPayload: payload as unknown as Record<string, unknown>,
       })
       .returning();
 

@@ -10,6 +10,20 @@ import {
 import { hasSufficientBalance } from "@/lib/utils/billing";
 import { getUserSession } from "@/lib/auth";
 import { normalizePhoneNumber } from "@/lib/utils";
+import type { Vapi } from "@vapi-ai/server-sdk";
+
+function getCreatedCallId(callResponse: Vapi.CallsCreateResponse): string {
+  if ("id" in callResponse) {
+    return callResponse.id;
+  }
+
+  const firstCreatedCall = callResponse.results[0];
+  if (!firstCreatedCall) {
+    throw new Error("Vapi n'a retourné aucun appel créé");
+  }
+
+  return firstCreatedCall.id;
+}
 
 export async function POST(req: Request) {
   try {
@@ -147,6 +161,7 @@ async function initiateEcommerceCall(
           provider: "google",
           model: "gemini-1.5-flash",
           messages: [{ role: "system", content: systemPrompt }],
+          tools: [{ type: "endCall" }],
           maxTokens: 250,
           temperature: 0.7,
         },
@@ -156,8 +171,8 @@ async function initiateEcommerceCall(
             process.env.ELEVENLABS_VOICE_ID ?? "EXAVITQu4vr4xnSDxMaL",
         },
         firstMessage: `Bonjour ${order.customerName}, c'est Amina de la boutique ${shopName}. Je vous appelle pour confirmer votre commande. Avez-vous quelques instants ?`,
-        endCallFunctionEnabled: true,
-        recordingEnabled: true,
+        endCallMessage: "Merci beaucoup. Je vous souhaite une excellente journée.",
+        artifactPlan: { recordingEnabled: true },
         transcriber: {
           provider: "deepgram",
           model: "nova-2",
@@ -165,12 +180,13 @@ async function initiateEcommerceCall(
         },
       },
     });
+    const vapiCallId = getCreatedCallId(callResponse);
 
     // 5. Enregistrer l'appel + mettre à jour le statut de la commande
     await db.transaction(async (tx) => {
       await tx.insert(calls).values({
         organizationId,
-        vapiCallId: callResponse.id,
+        vapiCallId,
         orderId: order.id,
         type: "ecommerce_confirmation",
         status: "queued",
@@ -183,13 +199,13 @@ async function initiateEcommerceCall(
     });
 
     console.log(
-      `[calls/initiate] Appel e-commerce lancé: ${callResponse.id} pour commande ${order.id}`
+      `[calls/initiate] Appel e-commerce lancé: ${vapiCallId} pour commande ${order.id}`
     );
 
     return NextResponse.json({
       success: true,
-      callId: callResponse.id,
-      vapiCallId: callResponse.id,
+      callId: vapiCallId,
+      vapiCallId,
     });
   } catch (vapiError) {
     console.error("[calls/initiate] Erreur Vapi:", vapiError);
@@ -279,6 +295,7 @@ async function initiateProspectingCall(
           provider: "google",
           model: "gemini-1.5-flash",
           messages: [{ role: "system", content: systemPrompt }],
+          tools: [{ type: "endCall" }],
           maxTokens: 300,
           temperature: 0.7,
         },
@@ -290,8 +307,8 @@ async function initiateProspectingCall(
         firstMessage: lead.name
           ? `Bonjour ${lead.name}, comment allez-vous ?`
           : "Bonjour, comment allez-vous ?",
-        endCallFunctionEnabled: true,
-        recordingEnabled: true,
+        endCallMessage: "Merci pour votre temps. Je vous souhaite une excellente journée.",
+        artifactPlan: { recordingEnabled: true },
         transcriber: {
           provider: "deepgram",
           model: "nova-2",
@@ -299,11 +316,12 @@ async function initiateProspectingCall(
         },
       },
     });
+    const vapiCallId = getCreatedCallId(callResponse);
 
     await db.transaction(async (tx) => {
       await tx.insert(calls).values({
         organizationId,
-        vapiCallId: callResponse.id,
+        vapiCallId,
         leadId,
         type: "prospecting",
         status: "queued",
@@ -315,7 +333,7 @@ async function initiateProspectingCall(
         .where(eq(leads.id, leadId));
     });
 
-    return NextResponse.json({ success: true, callId: callResponse.id });
+    return NextResponse.json({ success: true, callId: vapiCallId });
   } catch (vapiError) {
     console.error("[calls/initiate/prospecting] Erreur Vapi:", vapiError);
     return NextResponse.json(

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { db } from "@/lib/db";
 import { orders, organizations } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import { normalizePhoneNumber } from "@/lib/utils";
 
 interface WooCommerceOrderPayload {
@@ -147,7 +146,7 @@ export async function POST(req: Request) {
         totalAmount: payload.total,
         currency: payload.currency || "XOF",
         status: "pending",
-        rawPayload: payload as Record<string, unknown>,
+        rawPayload: payload as unknown as Record<string, unknown>,
       })
       .returning();
 

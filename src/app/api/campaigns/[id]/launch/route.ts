@@ -6,11 +6,25 @@ import { eq, and } from "drizzle-orm";
 import { hasSufficientBalance } from "@/lib/utils/billing";
 import { getVapiClient, generateProspectingPrompt } from "@/lib/vapi/client";
 import { normalizePhoneNumber } from "@/lib/utils";
+import type { Vapi } from "@vapi-ai/server-sdk";
 
 const BATCH_DELAY_MS = 2000; // 2 secondes entre chaque appel
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getCreatedCallId(callResponse: Vapi.CallsCreateResponse): string {
+  if ("id" in callResponse) {
+    return callResponse.id;
+  }
+
+  const firstCreatedCall = callResponse.results[0];
+  if (!firstCreatedCall) {
+    throw new Error("Vapi n'a retourné aucun appel créé");
+  }
+
+  return firstCreatedCall.id;
 }
 
 export async function POST(
@@ -126,6 +140,7 @@ export async function POST(
               provider: "google",
               model: "gemini-1.5-flash",
               messages: [{ role: "system", content: systemPrompt }],
+              tools: [{ type: "endCall" }],
               maxTokens: 300,
               temperature: 0.7,
             },
@@ -136,16 +151,17 @@ export async function POST(
             firstMessage: lead.name
               ? `Bonjour ${lead.name}, comment allez-vous ?`
               : "Bonjour, comment allez-vous ?",
-            endCallFunctionEnabled: true,
-            recordingEnabled: true,
+            endCallMessage: "Merci pour votre temps. Je vous souhaite une excellente journée.",
+            artifactPlan: { recordingEnabled: true },
           },
         });
+        const vapiCallId = getCreatedCallId(callResponse);
 
         // Enregistrer l'appel et mettre à jour le lead
         await db.transaction(async (tx) => {
           await tx.insert(calls).values({
             organizationId: session.organizationId,
-            vapiCallId: callResponse.id,
+            vapiCallId,
             leadId: lead.id,
             type: "prospecting",
             status: "queued",
@@ -158,7 +174,7 @@ export async function POST(
         });
 
         launched++;
-        console.log(`[batch/launch] Appel lancé: ${callResponse.id} → ${phone}`);
+        console.log(`[batch/launch] Appel lancé: ${vapiCallId} → ${phone}`);
 
         // Délai entre les appels pour éviter les rate limits
         if (launched < pendingLeads.length) {
