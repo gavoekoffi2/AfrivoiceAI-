@@ -165,7 +165,7 @@ export default async function DashboardOverview() {
               recentCalls.map((call) => (
                 <Link
                   key={call.id}
-                  href={`/dashboard/calls/${call.id}`}
+                  href={`/calls/${call.id}`}
                   className="flex items-center justify-between py-1 rounded px-1 hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-center gap-2 min-w-0">

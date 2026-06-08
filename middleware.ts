@@ -40,8 +40,13 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  // Protection des routes Dashboard
-  if (pathname.startsWith("/dashboard") && !user) {
+  const protectedRoutes = ["/", "/e-commerce", "/campaigns", "/calls", "/wallet", "/settings"];
+  const isProtectedPage = protectedRoutes.some((route) =>
+    route === "/" ? pathname === "/" : pathname === route || pathname.startsWith(`${route}/`)
+  );
+
+  // Protection des routes applicatives
+  if (isProtectedPage && !user) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
@@ -56,14 +61,7 @@ export async function middleware(request: NextRequest) {
 
   // Redirection des utilisateurs connectés loin des pages d'auth
   if ((pathname === "/login" || pathname === "/register") && user) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-
-  // Redirection depuis la racine
-  if (pathname === "/") {
-    return NextResponse.redirect(
-      new URL(user ? "/dashboard" : "/login", request.url)
-    );
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
   return supabaseResponse;

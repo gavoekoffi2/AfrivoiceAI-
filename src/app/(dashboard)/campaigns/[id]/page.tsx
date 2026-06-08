@@ -115,6 +115,7 @@ export default async function CampaignDetailPage({
     called: "info",
     qualified: "success",
     not_interested: "destructive",
+    callback: "warning",
     no_answer: "warning",
   };
 
@@ -135,7 +136,7 @@ export default async function CampaignDetailPage({
       {/* Navigation */}
       <div className="flex items-center gap-3">
         <Button asChild variant="ghost" size="sm">
-          <Link href="/dashboard/campaigns">
+          <Link href="/campaigns">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Campagnes
           </Link>
@@ -313,6 +314,8 @@ export default async function CampaignDetailPage({
                         ? "Qualifié"
                         : lead.status === "not_interested"
                         ? "Non intéressé"
+                        : lead.status === "callback"
+                        ? "À rappeler"
                         : "Sans réponse"}
                     </Badge>
                   </div>
@@ -350,7 +353,7 @@ export default async function CampaignDetailPage({
               {campaignCalls.map((call) => (
                 <Link
                   key={call.id}
-                  href={`/dashboard/calls/${call.id}`}
+                  href={`/calls/${call.id}`}
                   className="flex items-center justify-between rounded-md border p-3 hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">

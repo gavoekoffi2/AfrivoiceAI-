@@ -209,7 +209,7 @@ export default async function CallsPage({
               </p>
               {hasFilters && (
                 <Button asChild variant="outline" size="sm" className="mt-3">
-                  <Link href="/dashboard/calls">Effacer les filtres</Link>
+                  <Link href="/calls">Effacer les filtres</Link>
                 </Button>
               )}
             </div>
@@ -218,7 +218,7 @@ export default async function CallsPage({
               {allCalls.map((call) => (
                 <Link
                   key={call.id}
-                  href={`/dashboard/calls/${call.id}`}
+                  href={`/calls/${call.id}`}
                   className="flex items-center justify-between rounded-lg border p-3 hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -297,7 +297,7 @@ export default async function CallsPage({
                   <Button asChild variant="outline" size="sm">
                     <Link
                       href={{
-                        pathname: "/dashboard/calls",
+                        pathname: "/calls",
                         query: {
                           ...(typeFilter && { type: typeFilter }),
                           ...(statusFilter && { status: statusFilter }),
@@ -313,7 +313,7 @@ export default async function CallsPage({
                   <Button asChild variant="outline" size="sm">
                     <Link
                       href={{
-                        pathname: "/dashboard/calls",
+                        pathname: "/calls",
                         query: {
                           ...(typeFilter && { type: typeFilter }),
                           ...(statusFilter && { status: statusFilter }),

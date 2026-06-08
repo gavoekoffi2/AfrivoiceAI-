@@ -4,6 +4,7 @@ import { calls, orders, leads, wallets, transactions } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { verifyVapiWebhook } from "@/lib/vapi/verify";
 import { calculateClientCostFcfa } from "@/lib/utils/billing";
+import { classifyProspectingOutcome } from "@/lib/prospecting";
 
 interface VapiEndOfCallReport {
   message: {
@@ -188,11 +189,11 @@ export async function POST(req: Request) {
 
         // 4. Mettre à jour le statut du lead
         if (dbCall.leadId) {
-          const leadStatus =
-            summary?.toLowerCase().includes("intéressé") ||
-            summary?.toLowerCase().includes("qualifié")
-              ? "qualified"
-              : "not_interested";
+          const leadStatus = classifyProspectingOutcome({
+            summary,
+            transcript,
+            endedReason: call.endedReason,
+          });
 
           await tx
             .update(leads)

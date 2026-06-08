@@ -131,7 +131,7 @@ export const leads = pgTable(
     phone: text("phone").notNull(),
     company: text("company"),
     email: text("email"),
-    status: text("status").default("new").notNull(), // 'new', 'called', 'qualified', 'not_interested', 'no_answer'
+    status: text("status").default("new").notNull(), // 'new', 'called', 'qualified', 'callback', 'not_interested', 'no_answer'
     notes: text("notes"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },

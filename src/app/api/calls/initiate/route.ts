@@ -11,6 +11,7 @@ import { hasSufficientBalance } from "@/lib/utils/billing";
 import { getUserSession } from "@/lib/auth";
 import { normalizePhoneNumber } from "@/lib/utils";
 import type { Vapi } from "@vapi-ai/server-sdk";
+import { buildProspectingFirstMessage } from "@/lib/prospecting";
 
 function getCreatedCallId(callResponse: Vapi.CallsCreateResponse): string {
   if ("id" in callResponse) {
@@ -304,9 +305,10 @@ async function initiateProspectingCall(
           voiceId:
             process.env.ELEVENLABS_VOICE_ID ?? "EXAVITQu4vr4xnSDxMaL",
         },
-        firstMessage: lead.name
-          ? `Bonjour ${lead.name}, comment allez-vous ?`
-          : "Bonjour, comment allez-vous ?",
+        firstMessage: buildProspectingFirstMessage({
+          leadName: lead.name,
+          companyName: lead.company,
+        }),
         endCallMessage: "Merci pour votre temps. Je vous souhaite une excellente journée.",
         artifactPlan: { recordingEnabled: true },
         transcriber: {

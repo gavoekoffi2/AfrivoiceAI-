@@ -93,7 +93,7 @@ export default async function CallDetailPage({
       {/* Navigation */}
       <div className="flex items-center gap-3">
         <Button asChild variant="ghost" size="sm">
-          <Link href={call.type === "ecommerce_confirmation" ? "/dashboard/e-commerce" : "/dashboard/campaigns"}>
+          <Link href={call.type === "ecommerce_confirmation" ? "/e-commerce" : "/campaigns"}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             {call.type === "ecommerce_confirmation" ? "Commandes" : "Campagnes"}
           </Link>

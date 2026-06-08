@@ -5,7 +5,8 @@ import { db } from "@/lib/db";
 import { campaigns, leads } from "@/lib/db/schema";
 import { getUserSession } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
+import { normalizePhoneNumber } from "@/lib/utils";
 
 export async function createCampaignAction(formData: FormData) {
   const session = await getUserSession();
@@ -37,7 +38,7 @@ export async function createCampaignAction(formData: FormData) {
       })
       .returning();
 
-    revalidatePath("/dashboard/campaigns");
+    revalidatePath("/campaigns");
     return { success: true, campaign: result[0] };
   } catch (error) {
     console.error("[campaigns] Erreur création:", error);
@@ -63,7 +64,7 @@ export async function updateCampaignStatusAction(
         )
       );
 
-    revalidatePath("/dashboard/campaigns");
+    revalidatePath("/campaigns");
     return { success: true };
   } catch (error) {
     console.error("[campaigns] Erreur mise à jour statut:", error);
@@ -78,6 +79,14 @@ export async function importLeadsFromCsvAction(
   const session = await getUserSession();
   if (!session) return { error: "Non autorisé" };
 
+  if (leadsData.length === 0) {
+    return { error: "Aucun lead valide à importer." };
+  }
+
+  if (leadsData.length > 500) {
+    return { error: "Import limité à 500 leads par envoi pour éviter les abus." };
+  }
+
   // Vérifier que la campagne appartient à l'organisation
   const campaign = await db.query.campaigns.findFirst({
     where: and(
@@ -89,26 +98,67 @@ export async function importLeadsFromCsvAction(
   if (!campaign) return { error: "Campagne introuvable." };
 
   try {
-    const leadsToInsert = leadsData.map((lead) => ({
-      campaignId,
-      organizationId: session.organizationId,
-      name: lead.name,
-      phone: lead.phone,
-      company: lead.company,
-      email: lead.email,
-      status: "new" as const,
-    }));
+    const normalizedLeads = leadsData
+      .map((lead) => ({
+        ...lead,
+        phone: normalizePhoneNumber(lead.phone, "TG") ?? lead.phone,
+      }))
+      .filter((lead) => lead.phone.startsWith("+"));
 
-    await db.insert(leads).values(leadsToInsert);
+    if (normalizedLeads.length === 0) {
+      return { error: "Aucun numéro de téléphone valide trouvé." };
+    }
 
-    // Mettre à jour le total des leads
-    await db
-      .update(campaigns)
-      .set({ totalLeads: campaign.totalLeads + leadsData.length })
-      .where(eq(campaigns.id, campaignId));
+    const uniqueIncoming = Array.from(
+      new Map(normalizedLeads.map((lead) => [lead.phone, lead])).values()
+    );
 
-    revalidatePath(`/dashboard/campaigns/${campaignId}`);
-    return { success: true, count: leadsData.length };
+    const existingPhones = await db
+      .select({ phone: leads.phone })
+      .from(leads)
+      .where(
+        and(
+          eq(leads.campaignId, campaignId),
+          eq(leads.organizationId, session.organizationId),
+          inArray(
+            leads.phone,
+            uniqueIncoming.map((lead) => lead.phone)
+          )
+        )
+      );
+
+    const existingPhoneSet = new Set(existingPhones.map((lead) => lead.phone));
+    const leadsToInsert = uniqueIncoming
+      .filter((lead) => !existingPhoneSet.has(lead.phone))
+      .map((lead) => ({
+        campaignId,
+        organizationId: session.organizationId,
+        name: lead.name,
+        phone: lead.phone,
+        company: lead.company,
+        email: lead.email,
+        status: "new" as const,
+      }));
+
+    if (leadsToInsert.length === 0) {
+      return { success: true, count: 0, skipped: uniqueIncoming.length };
+    }
+
+    await db.transaction(async (tx) => {
+      await tx.insert(leads).values(leadsToInsert);
+
+      await tx
+        .update(campaigns)
+        .set({ totalLeads: campaign.totalLeads + leadsToInsert.length })
+        .where(eq(campaigns.id, campaignId));
+    });
+
+    revalidatePath(`/campaigns/${campaignId}`);
+    return {
+      success: true,
+      count: leadsToInsert.length,
+      skipped: leadsData.length - leadsToInsert.length,
+    };
   } catch (error) {
     console.error("[campaigns] Erreur import leads:", error);
     return { error: "Erreur lors de l'import des leads." };

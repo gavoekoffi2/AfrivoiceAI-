@@ -5,18 +5,13 @@ import { toast } from "sonner";
 import { Upload, FileText, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { importLeadsFromCsvAction } from "@/app/actions/campaigns";
-import { normalizePhoneNumber } from "@/lib/utils";
+import { parseLeadsCsv, type ProspectingLeadInput } from "@/lib/prospecting";
 
 interface LeadsImporterProps {
   campaignId: string;
 }
 
-interface ParsedLead {
-  name?: string;
-  phone: string;
-  company?: string;
-  email?: string;
-}
+type ParsedLead = ProspectingLeadInput;
 
 export function LeadsImporter({ campaignId }: LeadsImporterProps) {
   const [file, setFile] = useState<File | null>(null);
@@ -25,40 +20,15 @@ export function LeadsImporter({ campaignId }: LeadsImporterProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function parseCsv(content: string): ParsedLead[] {
-    const lines = content.trim().split("\n");
-    if (lines.length < 2) return [];
+    const result = parseLeadsCsv(content, "TG");
 
-    const headers = lines[0]
-      .split(",")
-      .map((h) => h.trim().toLowerCase().replace(/['"]/g, ""));
+    if (result.invalidRows > 0 || result.duplicates > 0) {
+      toast.info(
+        `${result.validLeads.length} lead(s) valides, ${result.duplicates} doublon(s), ${result.invalidRows} ligne(s) ignorée(s).`
+      );
+    }
 
-    return lines
-      .slice(1)
-      .map((line) => {
-        const values = line.split(",").map((v) => v.trim().replace(/['"]/g, ""));
-        const row: Record<string, string> = {};
-        headers.forEach((h, i) => {
-          row[h] = values[i] ?? "";
-        });
-
-        const phone =
-          row.telephone ||
-          row.phone ||
-          row.tel ||
-          row.mobile ||
-          row.numéro ||
-          "";
-
-        const normalizedPhone = normalizePhoneNumber(phone, "TG") ?? phone;
-
-        return {
-          name: row.nom || row.name || row.prénom || undefined,
-          phone: normalizedPhone,
-          company: row.entreprise || row.company || row.société || undefined,
-          email: row.email || row.mail || undefined,
-        };
-      })
-      .filter((lead) => lead.phone.length >= 8);
+    return result.validLeads;
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -107,7 +77,11 @@ export function LeadsImporter({ campaignId }: LeadsImporterProps) {
           return;
         }
 
-        toast.success(`${result.count} lead(s) importés avec succès !`);
+        toast.success(
+          `${result.count} lead(s) importés avec succès${
+            result.skipped ? `, ${result.skipped} ignoré(s)` : ""
+          } !`
+        );
         setFile(null);
         setPreview([]);
         if (fileInputRef.current) fileInputRef.current.value = "";
