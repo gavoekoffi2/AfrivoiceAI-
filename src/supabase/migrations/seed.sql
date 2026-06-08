@@ -1,0 +1,2 @@
+-- Optional local development seed file.
+-- Keep empty by default: app users/organizations/wallets are created during registration.
