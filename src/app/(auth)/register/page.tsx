@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useTransition, type FormEvent } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { PhoneCall } from "lucide-react";
@@ -19,7 +19,10 @@ import {
 export default function RegisterPage() {
   const [isPending, startTransition] = useTransition();
 
-  function handleSubmit(formData: FormData) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+
     startTransition(async () => {
       const result = await registerAction(formData);
       if (result?.error) {
@@ -50,7 +53,7 @@ export default function RegisterPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form action={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="organizationName" className="text-slate-300">
                   Nom de l&apos;entreprise
