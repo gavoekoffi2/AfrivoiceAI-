@@ -1,6 +1,13 @@
 import { db } from "./index";
-import { calls, orders, campaigns, wallets, transactions } from "./schema";
-import { eq, and, desc, count, sum, sql } from "drizzle-orm";
+import {
+  calls,
+  orders,
+  campaigns,
+  wallets,
+  transactions,
+  leads,
+} from "./schema";
+import { eq, and, desc, count, sql } from "drizzle-orm";
 
 export type OrganizationStats = {
   totalCalls: number;
@@ -116,6 +123,83 @@ export async function getCallsChartData(organizationId: string) {
     .orderBy(sql`DATE(${calls.createdAt})`);
 
   return result;
+}
+
+export type CampaignWithStats = typeof campaigns.$inferSelect & {
+  liveTotalLeads: number;
+  liveCalledLeads: number;
+  liveQualifiedLeads: number;
+};
+
+/**
+ * Campagnes d'une organisation avec compteurs calculés en direct depuis la
+ * table leads (les compteurs dénormalisés peuvent dériver).
+ */
+export async function getCampaignsWithStats(
+  organizationId: string
+): Promise<CampaignWithStats[]> {
+  const rows = await db
+    .select({
+      campaign: campaigns,
+      liveTotalLeads: sql<number>`count(${leads.id})::int`,
+      liveCalledLeads: sql<number>`count(${leads.id}) filter (where ${leads.status} != 'new')::int`,
+      liveQualifiedLeads: sql<number>`count(${leads.id}) filter (where ${leads.status} = 'qualified')::int`,
+    })
+    .from(campaigns)
+    .leftJoin(leads, eq(leads.campaignId, campaigns.id))
+    .where(eq(campaigns.organizationId, organizationId))
+    .groupBy(campaigns.id)
+    .orderBy(desc(campaigns.createdAt));
+
+  return rows.map((row) => ({
+    ...row.campaign,
+    liveTotalLeads: row.liveTotalLeads,
+    liveCalledLeads: row.liveCalledLeads,
+    liveQualifiedLeads: row.liveQualifiedLeads,
+  }));
+}
+
+export type CampaignLeadStats = {
+  total: number;
+  newLeads: number;
+  called: number;
+  qualified: number;
+  notInterested: number;
+  callback: number;
+  noAnswer: number;
+};
+
+/**
+ * Statistiques agrégées des leads d'une campagne (tous les leads, pas
+ * seulement la page affichée).
+ */
+export async function getCampaignLeadStats(
+  campaignId: string
+): Promise<CampaignLeadStats> {
+  const result = await db
+    .select({
+      total: sql<number>`count(*)::int`,
+      newLeads: sql<number>`count(*) filter (where ${leads.status} = 'new')::int`,
+      called: sql<number>`count(*) filter (where ${leads.status} != 'new')::int`,
+      qualified: sql<number>`count(*) filter (where ${leads.status} = 'qualified')::int`,
+      notInterested: sql<number>`count(*) filter (where ${leads.status} = 'not_interested')::int`,
+      callback: sql<number>`count(*) filter (where ${leads.status} = 'callback')::int`,
+      noAnswer: sql<number>`count(*) filter (where ${leads.status} = 'no_answer')::int`,
+    })
+    .from(leads)
+    .where(eq(leads.campaignId, campaignId));
+
+  return (
+    result[0] ?? {
+      total: 0,
+      newLeads: 0,
+      called: 0,
+      qualified: 0,
+      notInterested: 0,
+      callback: 0,
+      noAnswer: 0,
+    }
+  );
 }
 
 export async function getWalletWithTransactions(organizationId: string) {

@@ -32,6 +32,8 @@ export default async function DashboardLayout({
         <Header
           title="AfrivoiceAI"
           walletBalance={stats.walletBalance}
+          organizationName={session.organizationName}
+          userEmail={session.email}
         />
         <main className="flex-1 overflow-y-auto">
           {children}

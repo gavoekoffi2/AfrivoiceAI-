@@ -9,8 +9,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Wallet, ArrowUpCircle, ArrowDownCircle, Plus } from "lucide-react";
+import { Wallet, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { formatFcfa } from "@/lib/utils";
+import { getExchangeRateInfo } from "@/lib/utils/billing";
 import { WalletDepositButton } from "@/components/shared/wallet-deposit-button";
 import type { Transaction } from "@/lib/db/schema";
 
@@ -19,6 +20,7 @@ export default async function WalletPage() {
   if (!session) redirect("/login");
 
   const data = await getWalletWithTransactions(session.organizationId);
+  const { rateUsdToFcfa, marginPercentage } = getExchangeRateInfo();
 
   const balance = parseFloat(data?.wallet.balanceFcfa ?? "0");
   const txList: Transaction[] = data?.transactions ?? [];
@@ -47,7 +49,8 @@ export default async function WalletPage() {
               {formatFcfa(balance)}
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              ≈ {(balance / 600).toFixed(2)} USD (taux : 1 USD = 600 FCFA)
+              ≈ {(balance / rateUsdToFcfa).toFixed(2)} USD (taux : 1 USD ={" "}
+              {rateUsdToFcfa} FCFA)
             </p>
             <div className="mt-4">
               <WalletDepositButton />
@@ -60,29 +63,37 @@ export default async function WalletPage() {
           <CardHeader>
             <CardTitle>Tarification</CardTitle>
             <CardDescription>
-              Coût des appels IA (marge 30% incluse)
+              Coût des appels IA (marge {marginPercentage}% incluse)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Taux de change</span>
-              <span className="font-medium">1 USD = 600 FCFA</span>
+              <span className="font-medium">
+                1 USD = {rateUsdToFcfa} FCFA
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Marge appliquée</span>
-              <span className="font-medium">+30%</span>
+              <span className="font-medium">+{marginPercentage}%</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">
                 Coût estimé / appel (1 min)
               </span>
-              <span className="font-medium">~52 FCFA</span>
+              <span className="font-medium">
+                ~{Math.ceil(0.02 * rateUsdToFcfa * (1 + marginPercentage / 100))}{" "}
+                FCFA
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">
                 Coût estimé / appel (3 min)
               </span>
-              <span className="font-medium">~156 FCFA</span>
+              <span className="font-medium">
+                ~{Math.ceil(0.06 * rateUsdToFcfa * (1 + marginPercentage / 100))}{" "}
+                FCFA
+              </span>
             </div>
           </CardContent>
         </Card>

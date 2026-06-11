@@ -1,17 +1,20 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { db } from "@/lib/db";
-import { orders, organizations } from "@/lib/db/schema";
+import { orders } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 import { normalizePhoneNumber } from "@/lib/utils";
+import { resolveWebhookOrganization } from "@/lib/webhooks";
+import { initiateOrderCall } from "@/lib/calls/initiate";
 
 interface WooCommerceOrderPayload {
-  id: number;
-  status: string;
-  total: string;
-  currency: string;
-  payment_method: string;
-  payment_method_title: string;
-  billing: {
+  id?: number;
+  status?: string;
+  total?: string;
+  currency?: string;
+  payment_method?: string;
+  payment_method_title?: string;
+  billing?: {
     first_name?: string;
     last_name?: string;
     phone?: string;
@@ -19,7 +22,7 @@ interface WooCommerceOrderPayload {
     city?: string;
     country?: string;
   };
-  shipping: {
+  shipping?: {
     first_name?: string;
     last_name?: string;
     phone?: string;
@@ -34,10 +37,10 @@ function verifyWooCommerceWebhook(
   rawBody: string,
   signature: string | null
 ): boolean {
-  if (!signature) return false;
-
   const secret = process.env.WOOCOMMERCE_WEBHOOK_SECRET;
   if (!secret) return true; // Pas de secret configuré, accepter en dev
+
+  if (!signature) return false;
 
   const computedHash = crypto
     .createHmac("sha256", secret)
@@ -77,10 +80,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ received: true });
     }
 
-    const payload: WooCommerceOrderPayload = JSON.parse(rawBody);
+    // WooCommerce envoie un "ping" non-JSON (webhook_id=...) à l'activation
+    // du webhook : il faut répondre 200 sinon l'activation échoue.
+    let payload: WooCommerceOrderPayload;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ received: true, action: "ping_acknowledged" });
+    }
+
+    if (payload.id === undefined || payload.id === null) {
+      return NextResponse.json({ received: true, action: "ignored_no_id" });
+    }
 
     // Vérifier si c'est une commande COD
-    if (!isWooCommerceCOD(payload.payment_method)) {
+    if (!payload.payment_method || !isWooCommerceCOD(payload.payment_method)) {
       return NextResponse.json({
         received: true,
         action: "ignored_non_cod",
@@ -88,28 +102,46 @@ export async function POST(req: Request) {
       });
     }
 
-    // Chercher l'organisation (en production, associer via le domaine WooCommerce)
-    const orgResult = await db.select().from(organizations).limit(1);
-    const organization = orgResult[0];
-
+    // Identifier l'organisation destinataire (?org=<id> dans l'URL du webhook)
+    const organization = await resolveWebhookOrganization(req.url);
     if (!organization) {
       return NextResponse.json(
-        { error: "Organisation introuvable" },
+        { error: "Organisation introuvable — vérifiez le paramètre ?org= de l'URL du webhook" },
         { status: 404 }
       );
     }
 
-    // Extraire les données client (billing > shipping)
+    const externalId = payload.id.toString();
+
+    // Idempotence : WooCommerce relivre les webhooks en cas de timeout
+    const existing = await db
+      .select({ id: orders.id })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.organizationId, organization.id),
+          eq(orders.source, "woocommerce"),
+          eq(orders.externalId, externalId)
+        )
+      )
+      .limit(1);
+
+    if (existing[0]) {
+      return NextResponse.json({
+        received: true,
+        orderId: existing[0].id,
+        action: "duplicate_ignored",
+      });
+    }
+
+    // Extraire les données client (shipping > billing)
     const firstName =
-      payload.shipping?.first_name ||
-      payload.billing?.first_name ||
-      "";
+      payload.shipping?.first_name || payload.billing?.first_name || "";
     const lastName =
       payload.shipping?.last_name || payload.billing?.last_name || "";
     const customerName = `${firstName} ${lastName}`.trim() || "Client";
 
-    const rawPhone =
-      payload.billing?.phone || payload.shipping?.phone || "";
+    const rawPhone = payload.billing?.phone || payload.shipping?.phone || "";
 
     if (!rawPhone) {
       return NextResponse.json(
@@ -138,12 +170,12 @@ export async function POST(req: Request) {
       .insert(orders)
       .values({
         organizationId: organization.id,
-        externalId: payload.id.toString(),
+        externalId,
         source: "woocommerce",
         customerName,
         customerPhone: normalizedPhone,
         customerAddress: address || null,
-        totalAmount: payload.total,
+        totalAmount: payload.total ?? null,
         currency: payload.currency || "XOF",
         status: "pending",
         rawPayload: payload as unknown as Record<string, unknown>,
@@ -154,26 +186,18 @@ export async function POST(req: Request) {
       `[woocommerce/webhook] Commande COD créée: ${insertedOrder[0].id} pour ${customerName}`
     );
 
-    // Déclencher l'appel de confirmation
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-    fetch(`${baseUrl}/api/calls/initiate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-internal-secret": process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
-      },
-      body: JSON.stringify({ orderId: insertedOrder[0].id }),
-    }).catch((err) => {
-      console.error(
-        `[woocommerce/webhook] Erreur déclenchement appel:`,
-        err
-      );
-    });
+    // Déclencher l'appel de confirmation (appel direct, sans HTTP interne)
+    const callResult = await initiateOrderCall(insertedOrder[0]).catch(
+      (err) => {
+        console.error(`[woocommerce/webhook] Erreur déclenchement appel:`, err);
+        return null;
+      }
+    );
 
     return NextResponse.json({
       received: true,
       orderId: insertedOrder[0].id,
-      action: "call_initiated",
+      action: callResult?.ok ? "call_initiated" : "order_created",
     });
   } catch (error) {
     console.error("[woocommerce/webhook] Erreur:", error);

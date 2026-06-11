@@ -270,14 +270,14 @@ export default async function SettingsPage() {
                 {
                   label: "Shopify — Création de commande",
                   icon: ShoppingCart,
-                  path: "/api/webhooks/shopify",
+                  path: `/api/webhooks/shopify?org=${session.organizationId}`,
                   instructions:
                     "Shopify Admin → Paramètres → Notifications → Webhooks → Créer un webhook (Topic: orders/create)",
                 },
                 {
                   label: "WooCommerce — Création de commande",
                   icon: ShoppingCart,
-                  path: "/api/webhooks/woocommerce",
+                  path: `/api/webhooks/woocommerce?org=${session.organizationId}`,
                   instructions:
                     "WooCommerce → Paramètres → Avancé → Webhooks → Ajouter un webhook (Topic: Order created)",
                 },
@@ -286,7 +286,7 @@ export default async function SettingsPage() {
                   icon: PhoneCall,
                   path: "/api/webhooks/vapi",
                   instructions:
-                    "Dashboard Vapi → Settings → Webhooks → Server URL",
+                    "Dashboard Vapi → Settings → Server URL (+ Server URL Secret = VAPI_WEBHOOK_SECRET)",
                 },
               ].map((wh) => (
                 <div key={wh.path} className="space-y-2">

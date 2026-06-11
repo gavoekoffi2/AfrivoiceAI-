@@ -33,6 +33,7 @@ import {
   formatDuration,
   getCallStatusLabel,
   getOrderStatusLabel,
+  isUuid,
 } from "@/lib/utils";
 import { AudioPlayer } from "@/components/shared/audio-player";
 
@@ -52,6 +53,8 @@ export default async function CallDetailPage({
 }) {
   const session = await getUserSession();
   if (!session) redirect("/login");
+
+  if (!isUuid(params.id)) notFound();
 
   const callResult = await db
     .select()

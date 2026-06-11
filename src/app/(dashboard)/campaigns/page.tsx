@@ -1,9 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getUserSession } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { campaigns } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { getCampaignsWithStats } from "@/lib/db/queries";
 import {
   Card,
   CardContent,
@@ -39,11 +37,7 @@ export default async function CampaignsPage() {
   const session = await getUserSession();
   if (!session) redirect("/login");
 
-  const allCampaigns = await db
-    .select()
-    .from(campaigns)
-    .where(eq(campaigns.organizationId, session.organizationId))
-    .orderBy(desc(campaigns.createdAt));
+  const allCampaigns = await getCampaignsWithStats(session.organizationId);
 
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
@@ -82,9 +76,10 @@ export default async function CampaignsPage() {
             const StatusIcon = config.icon;
 
             const successRate =
-              campaign.calledLeads > 0
+              campaign.liveCalledLeads > 0
                 ? Math.round(
-                    (campaign.qualifiedLeads / campaign.calledLeads) * 100
+                    (campaign.liveQualifiedLeads / campaign.liveCalledLeads) *
+                      100
                   )
                 : 0;
 
@@ -111,13 +106,13 @@ export default async function CampaignsPage() {
                   <div className="grid grid-cols-3 gap-2 text-center mb-4">
                     <div>
                       <p className="text-xl font-bold">
-                        {campaign.totalLeads}
+                        {campaign.liveTotalLeads}
                       </p>
                       <p className="text-xs text-muted-foreground">Leads</p>
                     </div>
                     <div>
                       <p className="text-xl font-bold">
-                        {campaign.calledLeads}
+                        {campaign.liveCalledLeads}
                       </p>
                       <p className="text-xs text-muted-foreground">Appelés</p>
                     </div>

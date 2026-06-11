@@ -1,4 +1,5 @@
 import { VapiClient } from "@vapi-ai/server-sdk/Client";
+import type { Vapi } from "@vapi-ai/server-sdk";
 
 let vapiInstance: VapiClient | null = null;
 
@@ -11,6 +12,66 @@ export function getVapiClient(): VapiClient {
     vapiInstance = new VapiClient({ token: apiKey });
   }
   return vapiInstance;
+}
+
+// Garde-fou coût : un appel ne peut pas dépasser 5 minutes
+const MAX_CALL_DURATION_SECONDS = 300;
+
+/**
+ * Configuration unique de l'assistant vocal (modèle, voix, transcription).
+ * Utilisée par tous les points d'entrée qui lancent un appel, pour éviter
+ * les divergences (ex. transcription en anglais sur un chemin de code).
+ */
+export function buildAssistantConfig(params: {
+  systemPrompt: string;
+  firstMessage: string;
+  endCallMessage: string;
+  maxTokens?: number;
+}): Vapi.CreateAssistantDto {
+  return {
+    model: {
+      provider: "google",
+      model: "gemini-1.5-flash",
+      messages: [{ role: "system", content: params.systemPrompt }],
+      tools: [{ type: "endCall" }],
+      maxTokens: params.maxTokens ?? 300,
+      temperature: 0.7,
+    },
+    voice: {
+      provider: "11labs",
+      voiceId: process.env.ELEVENLABS_VOICE_ID ?? "EXAVITQu4vr4xnSDxMaL",
+      // Indispensable pour des appels en français
+      model: "eleven_multilingual_v2",
+    },
+    transcriber: {
+      provider: "deepgram",
+      model: "nova-2",
+      language: "fr",
+    },
+    firstMessage: params.firstMessage,
+    endCallMessage: params.endCallMessage,
+    maxDurationSeconds: MAX_CALL_DURATION_SECONDS,
+    artifactPlan: { recordingEnabled: true },
+  };
+}
+
+/**
+ * Extrait l'identifiant du premier appel créé par l'API Vapi
+ * (la réponse peut être un appel unique ou un batch).
+ */
+export function getCreatedCallId(
+  callResponse: Vapi.CallsCreateResponse
+): string {
+  if ("id" in callResponse) {
+    return callResponse.id;
+  }
+
+  const firstCreatedCall = callResponse.results[0];
+  if (!firstCreatedCall) {
+    throw new Error("Vapi n'a retourné aucun appel créé");
+  }
+
+  return firstCreatedCall.id;
 }
 
 /**

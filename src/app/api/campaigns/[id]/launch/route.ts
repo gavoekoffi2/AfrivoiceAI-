@@ -1,31 +1,19 @@
 import { NextResponse } from "next/server";
 import { getUserSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { campaigns, leads, calls, wallets } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { campaigns, leads, wallets } from "@/lib/db/schema";
+import { eq, and, count } from "drizzle-orm";
 import { hasSufficientBalance } from "@/lib/utils/billing";
-import { getVapiClient, generateProspectingPrompt } from "@/lib/vapi/client";
-import { normalizePhoneNumber } from "@/lib/utils";
-import type { Vapi } from "@vapi-ai/server-sdk";
-import { buildProspectingFirstMessage } from "@/lib/prospecting";
+import { initiateLeadCall } from "@/lib/calls/initiate";
+import { isUuid } from "@/lib/utils";
 
-const BATCH_DELAY_MS = 2000; // 2 secondes entre chaque appel
+// Les fonctions serverless (Netlify/Vercel) ont un timeout court (~10 s) :
+// on lance de petits lots rapides, le client relance tant qu'il reste des leads.
+const BATCH_SIZE = 5;
+const BATCH_DELAY_MS = 250;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function getCreatedCallId(callResponse: Vapi.CallsCreateResponse): string {
-  if ("id" in callResponse) {
-    return callResponse.id;
-  }
-
-  const firstCreatedCall = callResponse.results[0];
-  if (!firstCreatedCall) {
-    throw new Error("Vapi n'a retourné aucun appel créé");
-  }
-
-  return firstCreatedCall.id;
 }
 
 export async function POST(
@@ -39,6 +27,12 @@ export async function POST(
     }
 
     const campaignId = params.id;
+    if (!isUuid(campaignId)) {
+      return NextResponse.json(
+        { error: "Campagne introuvable" },
+        { status: 404 }
+      );
+    }
 
     // Vérifier la campagne
     const campaignResult = await db
@@ -75,10 +69,7 @@ export async function POST(
       .where(eq(wallets.organizationId, session.organizationId))
       .limit(1);
 
-    if (
-      !walletResult[0] ||
-      !hasSufficientBalance(walletResult[0].balanceFcfa)
-    ) {
+    if (!walletResult[0] || !hasSufficientBalance(walletResult[0].balanceFcfa)) {
       return NextResponse.json(
         { error: "Solde insuffisant pour lancer des appels." },
         { status: 402 }
@@ -89,115 +80,55 @@ export async function POST(
     const pendingLeads = await db
       .select()
       .from(leads)
-      .where(
-        and(
-          eq(leads.campaignId, campaignId),
-          eq(leads.status, "new")
-        )
-      )
-      .limit(10); // Limite à 10 appels par batch
+      .where(and(eq(leads.campaignId, campaignId), eq(leads.status, "new")))
+      .limit(BATCH_SIZE);
 
     if (pendingLeads.length === 0) {
       return NextResponse.json({
         launched: 0,
+        remaining: 0,
         message: "Aucun lead en attente.",
       });
     }
 
-    const vapi = getVapiClient();
     let launched = 0;
+    let stoppedReason: string | null = null;
     const errors: string[] = [];
 
     for (const lead of pendingLeads) {
-      try {
-        // Vérifier le solde avant chaque appel
-        const freshWallet = await db
-          .select({ balance: wallets.balanceFcfa })
-          .from(wallets)
-          .where(eq(wallets.organizationId, session.organizationId))
-          .limit(1);
+      const result = await initiateLeadCall({ lead, campaign });
 
-        if (!freshWallet[0] || !hasSufficientBalance(freshWallet[0].balance)) {
-          console.log("[batch/launch] Solde insuffisant, arrêt du batch");
-          break;
-        }
-
-        const phone = normalizePhoneNumber(lead.phone, "TG") ?? lead.phone;
-        const systemPrompt = generateProspectingPrompt({
-          objective: campaign.objective,
-          scriptTemplate: campaign.scriptTemplate,
-          leadName: lead.name ?? undefined,
-          companyName: lead.company ?? undefined,
-        });
-
-        const callResponse = await vapi.calls.create({
-          phoneNumberId: process.env.VAPI_PHONE_NUMBER_ID!,
-          customer: {
-            number: phone,
-            name: lead.name ?? undefined,
-          },
-          assistant: {
-            model: {
-              provider: "google",
-              model: "gemini-1.5-flash",
-              messages: [{ role: "system", content: systemPrompt }],
-              tools: [{ type: "endCall" }],
-              maxTokens: 300,
-              temperature: 0.7,
-            },
-            voice: {
-              provider: "11labs",
-              voiceId: process.env.ELEVENLABS_VOICE_ID ?? "EXAVITQu4vr4xnSDxMaL",
-            },
-            firstMessage: buildProspectingFirstMessage({
-              leadName: lead.name,
-              companyName: lead.company,
-            }),
-            endCallMessage: "Merci pour votre temps. Je vous souhaite une excellente journée.",
-            artifactPlan: { recordingEnabled: true },
-          },
-        });
-        const vapiCallId = getCreatedCallId(callResponse);
-
-        // Enregistrer l'appel et mettre à jour le lead
-        await db.transaction(async (tx) => {
-          await tx.insert(calls).values({
-            organizationId: session.organizationId,
-            vapiCallId,
-            leadId: lead.id,
-            type: "prospecting",
-            status: "queued",
-          });
-
-          await tx
-            .update(leads)
-            .set({ status: "called" })
-            .where(eq(leads.id, lead.id));
-        });
-
+      if (result.ok) {
         launched++;
-        console.log(`[batch/launch] Appel lancé: ${vapiCallId} → ${phone}`);
-
-        // Délai entre les appels pour éviter les rate limits
-        if (launched < pendingLeads.length) {
-          await sleep(BATCH_DELAY_MS);
-        }
-      } catch (err) {
-        console.error(`[batch/launch] Erreur pour lead ${lead.id}:`, err);
+      } else if (result.status === 402) {
+        // Solde épuisé : inutile de continuer le lot
+        stoppedReason = result.error;
+        break;
+      } else {
+        console.error(
+          `[batch/launch] Erreur pour lead ${lead.id}: ${result.error}`
+        );
         errors.push(lead.id);
+      }
+
+      if (launched < pendingLeads.length) {
+        await sleep(BATCH_DELAY_MS);
       }
     }
 
-    // Mettre à jour les compteurs de la campagne
-    await db
-      .update(campaigns)
-      .set({ calledLeads: campaign.calledLeads + launched })
-      .where(eq(campaigns.id, campaignId));
+    const remainingResult = await db
+      .select({ count: count() })
+      .from(leads)
+      .where(and(eq(leads.campaignId, campaignId), eq(leads.status, "new")));
+    const remaining = remainingResult[0]?.count ?? 0;
 
     return NextResponse.json({
       launched,
+      remaining,
       errors: errors.length,
-      message: `${launched} appel(s) lancé(s) avec succès.`,
+      message: stoppedReason
+        ? `${launched} appel(s) lancé(s), puis arrêt : ${stoppedReason}`
+        : `${launched} appel(s) lancé(s) avec succès.`,
     });
   } catch (error) {
     console.error("[batch/launch] Erreur:", error);

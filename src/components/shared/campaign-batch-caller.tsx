@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Play, Pause, Loader2, PhoneCall } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ export function CampaignBatchCaller({
 }: CampaignBatchCallerProps) {
   const [isPending, startTransition] = useTransition();
   const [isLaunching, setIsLaunching] = useState(false);
+  const router = useRouter();
 
   function handleStatusChange(
     newStatus: "active" | "paused" | "completed" | "draft"
@@ -57,9 +59,14 @@ export function CampaignBatchCaller({
 
       if (!response.ok) {
         toast.error(data.error ?? "Erreur lors du lancement des appels.");
+      } else if (data.remaining > 0) {
+        toast.success(
+          `${data.launched} appel(s) lancé(s). ${data.remaining} lead(s) restant(s) — relancez pour continuer.`
+        );
       } else {
         toast.success(`${data.launched} appel(s) lancés avec succès !`);
       }
+      router.refresh();
     } catch {
       toast.error("Erreur réseau. Vérifiez votre connexion.");
     } finally {

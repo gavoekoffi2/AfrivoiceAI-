@@ -67,9 +67,6 @@ export default async function EcommercePage() {
     .orderBy(desc(orders.createdAt))
     .limit(50);
 
-  // Récupérer les derniers appels pour chaque commande
-  const orderIds = allOrders.map((o) => o.id);
-
   const stats = {
     total: allOrders.length,
     pending: allOrders.filter((o) => o.status === "pending").length,
@@ -164,7 +161,8 @@ export default async function EcommercePage() {
             </CardHeader>
             <CardContent>
               <code className="block rounded-md bg-muted p-2 text-xs font-mono break-all">
-                {baseUrl}{wh.path}
+                {baseUrl}
+                {wh.path}?org={session.organizationId}
               </code>
               <p className="mt-1 text-xs text-muted-foreground">
                 {wh.instructions}

@@ -169,8 +169,10 @@ export function classifyProspectingOutcome(params: {
       "messagerie",
       "voicemail",
       "occupe",
+      "busy",
       "unreachable",
       "did not answer",
+      "did-not-answer",
     ])
   ) {
     return "no_answer";

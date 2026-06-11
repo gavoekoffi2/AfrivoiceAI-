@@ -24,7 +24,13 @@ import {
   Pause,
   Target,
 } from "lucide-react";
-import { formatFcfa, formatDuration, getCallStatusLabel } from "@/lib/utils";
+import {
+  formatFcfa,
+  formatDuration,
+  getCallStatusLabel,
+  isUuid,
+} from "@/lib/utils";
+import { getCampaignLeadStats } from "@/lib/db/queries";
 import { LeadsImporter } from "@/components/shared/leads-importer";
 import { CampaignBatchCaller } from "@/components/shared/campaign-batch-caller";
 
@@ -35,6 +41,8 @@ export default async function CampaignDetailPage({
 }) {
   const session = await getUserSession();
   if (!session) redirect("/login");
+
+  if (!isUuid(params.id)) notFound();
 
   // Récupérer la campagne
   const campaignResult = await db
@@ -84,19 +92,15 @@ export default async function CampaignDetailPage({
           .limit(30)
       : [];
 
-  const newLeads = campaignLeads.filter((l) => l.status === "new").length;
-  const calledLeads = campaignLeads.filter((l) => l.status !== "new").length;
-  const qualifiedLeads = campaignLeads.filter(
-    (l) => l.status === "qualified"
-  ).length;
-  const notInterestedLeads = campaignLeads.filter(
-    (l) => l.status === "not_interested"
-  ).length;
+  // Statistiques sur TOUS les leads (la liste affichée est limitée à 50)
+  const leadStats = await getCampaignLeadStats(params.id);
+  const newLeads = leadStats.newLeads;
+  const calledLeads = leadStats.called;
+  const qualifiedLeads = leadStats.qualified;
+  const totalLeads = leadStats.total;
 
   const progressPercent =
-    campaignLeads.length > 0
-      ? Math.round((calledLeads / campaignLeads.length) * 100)
-      : 0;
+    totalLeads > 0 ? Math.round((calledLeads / totalLeads) * 100) : 0;
 
   const successRate =
     calledLeads > 0 ? Math.round((qualifiedLeads / calledLeads) * 100) : 0;
@@ -174,13 +178,13 @@ export default async function CampaignDetailPage({
       </div>
 
       {/* Progression */}
-      {campaignLeads.length > 0 && (
+      {totalLeads > 0 && (
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium">Progression</span>
               <span className="text-sm text-muted-foreground">
-                {calledLeads} / {campaignLeads.length} leads contactés
+                {calledLeads} / {totalLeads} leads contactés
               </span>
             </div>
             <Progress value={progressPercent} className="h-2" />
@@ -196,7 +200,7 @@ export default async function CampaignDetailPage({
         {[
           {
             label: "Total leads",
-            value: campaignLeads.length,
+            value: totalLeads,
             icon: Users,
             color: "text-blue-500",
           },
@@ -262,7 +266,7 @@ export default async function CampaignDetailPage({
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              <span>Leads ({campaignLeads.length})</span>
+              <span>Leads ({totalLeads})</span>
               {totalCostFcfa > 0 && (
                 <span className="text-sm font-normal text-muted-foreground">
                   Coût total : {formatFcfa(totalCostFcfa)}
