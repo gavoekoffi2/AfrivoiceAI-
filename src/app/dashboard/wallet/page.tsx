@@ -82,7 +82,7 @@ export default async function WalletPage() {
                 Coût estimé / appel (1 min)
               </span>
               <span className="font-medium">
-                ~{Math.ceil(0.02 * rateUsdToFcfa * (1 + marginPercentage / 100))}{" "}
+                ~{Math.ceil(0.08 * rateUsdToFcfa * (1 + marginPercentage / 100))}{" "}
                 FCFA
               </span>
             </div>
@@ -91,7 +91,7 @@ export default async function WalletPage() {
                 Coût estimé / appel (3 min)
               </span>
               <span className="font-medium">
-                ~{Math.ceil(0.06 * rateUsdToFcfa * (1 + marginPercentage / 100))}{" "}
+                ~{Math.ceil(0.24 * rateUsdToFcfa * (1 + marginPercentage / 100))}{" "}
                 FCFA
               </span>
             </div>

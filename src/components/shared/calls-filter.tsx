@@ -12,6 +12,7 @@ const TYPE_OPTIONS = [
   { value: "", label: "Tous les types" },
   { value: "ecommerce_confirmation", label: "E-commerce" },
   { value: "prospecting", label: "Prospection" },
+  { value: "test", label: "Tests" },
 ];
 
 const STATUS_OPTIONS = [

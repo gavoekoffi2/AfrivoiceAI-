@@ -32,9 +32,12 @@ import {
   formatFcfa,
   formatDuration,
   getCallStatusLabel,
+  getCallTypeLabel,
   getOrderStatusLabel,
+  isActiveCallStatus,
   isUuid,
 } from "@/lib/utils";
+import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { AudioPlayer } from "@/components/shared/audio-player";
 
 const callStatusColors: Record<string, "success" | "destructive" | "warning" | "secondary" | "info"> = {
@@ -93,12 +96,25 @@ export default async function CallDetailPage({
 
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
+      <AutoRefresh enabled={isActiveCallStatus(call.status)} />
       {/* Navigation */}
       <div className="flex items-center gap-3">
         <Button asChild variant="ghost" size="sm">
-          <Link href={call.type === "ecommerce_confirmation" ? "/e-commerce" : "/campaigns"}>
+          <Link
+            href={
+              call.type === "ecommerce_confirmation"
+                ? "/dashboard/e-commerce"
+                : call.type === "test"
+                ? "/dashboard/calls"
+                : "/dashboard/campaigns"
+            }
+          >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            {call.type === "ecommerce_confirmation" ? "Commandes" : "Campagnes"}
+            {call.type === "ecommerce_confirmation"
+              ? "Commandes"
+              : call.type === "test"
+              ? "Appels"
+              : "Campagnes"}
           </Link>
         </Button>
         <span className="text-muted-foreground">/</span>
@@ -110,9 +126,7 @@ export default async function CallDetailPage({
         <div>
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold tracking-tight">
-              {call.type === "ecommerce_confirmation"
-                ? "Confirmation de commande"
-                : "Appel de prospection"}
+              {getCallTypeLabel(call.type)}
             </h2>
             <Badge variant={callStatusColors[call.status] ?? "secondary"}>
               {getCallStatusLabel(call.status)}

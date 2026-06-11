@@ -207,6 +207,93 @@ export async function initiateLeadCall(params: {
 }
 
 /**
+ * Lance un appel de démonstration vers le numéro du nouvel utilisateur :
+ * c'est le moyen le plus rapide de valider toute la chaîne (Vapi, voix,
+ * webhook, facturation) sans importer de leads ni brancher une boutique.
+ */
+export async function initiateTestCall(params: {
+  organizationId: string;
+  phone: string;
+  name?: string;
+}): Promise<InitiateCallResult> {
+  const balance = await getWalletBalance(params.organizationId);
+  if (balance === null || !hasSufficientBalance(balance)) {
+    return {
+      ok: false,
+      status: 402,
+      error: "Solde insuffisant. Rechargez votre wallet pour tester un appel.",
+    };
+  }
+
+  const phone = normalizePhoneNumber(params.phone, "TG");
+  if (!phone) {
+    return {
+      ok: false,
+      status: 422,
+      error:
+        "Numéro de téléphone invalide. Utilisez le format international, ex: +228 90 00 00 00.",
+    };
+  }
+
+  const orgResult = await db
+    .select({ name: organizations.name })
+    .from(organizations)
+    .where(eq(organizations.id, params.organizationId))
+    .limit(1);
+  const orgName = orgResult[0]?.name ?? "votre entreprise";
+
+  const displayName = params.name?.trim() || "cher utilisateur";
+
+  const systemPrompt = `Tu es Amina, l'assistante vocale de démonstration d'AfrivoiceAI, la plateforme d'appels IA pour l'Afrique.
+Tu appelles ${displayName} de l'entreprise "${orgName}" qui vient de créer son compte et teste la plateforme.
+
+Déroulé de l'appel :
+1. Félicite-le chaleureusement : son compte AfrivoiceAI fonctionne, c'est l'IA qui parle en ce moment même.
+2. Explique en deux phrases ce que la plateforme sait faire : prospection téléphonique B2B automatisée et confirmation des commandes e-commerce en paiement à la livraison.
+3. Fais une mini démonstration : pose-lui UNE question de qualification, par exemple "quel type de clients aimeriez-vous contacter ?" et rebondis brièvement sur sa réponse.
+4. Conclus : il peut maintenant importer ses leads ou connecter sa boutique depuis le dashboard. Souhaite-lui une excellente journée et termine l'appel.
+
+Règles :
+- Parle uniquement en français, ton chaleureux et professionnel.
+- Appel court : 60 à 90 secondes maximum.
+- Termine avec l'outil endCall dès que la démonstration est faite.`;
+
+  try {
+    const vapi = getVapiClient();
+    const callResponse = await vapi.calls.create({
+      phoneNumberId: process.env.VAPI_PHONE_NUMBER_ID!,
+      customer: { number: phone, name: params.name?.trim() || undefined },
+      assistant: buildAssistantConfig({
+        systemPrompt,
+        firstMessage: `Bonjour ${displayName} ! Ici Amina, la voix d'AfrivoiceAI. Bonne nouvelle : votre plateforme d'appels est opérationnelle. Vous m'entendez bien ?`,
+        endCallMessage:
+          "Merci et à très vite sur AfrivoiceAI. Excellente journée !",
+        maxTokens: 250,
+      }),
+    });
+    const vapiCallId = getCreatedCallId(callResponse);
+
+    await db.insert(calls).values({
+      organizationId: params.organizationId,
+      vapiCallId,
+      type: "test",
+      status: "queued",
+    });
+
+    console.log(`[calls/test] Appel de test lancé: ${vapiCallId} → ${phone}`);
+    return { ok: true, vapiCallId };
+  } catch (vapiError) {
+    console.error("[calls/test] Erreur Vapi:", vapiError);
+    return {
+      ok: false,
+      status: 503,
+      error:
+        "Impossible de lancer l'appel de test. Vérifiez la configuration Vapi (clé API et numéro).",
+    };
+  }
+}
+
+/**
  * Charge un lead et sa campagne (scopés organisation) puis lance l'appel.
  */
 export async function initiateLeadCallById(

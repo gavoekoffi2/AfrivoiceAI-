@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { formatFcfa, getOrderStatusLabel } from "@/lib/utils";
 import { ManualCallButton } from "@/components/shared/manual-call-button";
+import { AutoRefresh } from "@/components/shared/auto-refresh";
 
 const statusConfig = {
   pending: {
@@ -89,6 +90,7 @@ export default async function EcommercePage() {
 
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
+      <AutoRefresh enabled={stats.calling > 0} />
       <div>
         <h2 className="text-2xl font-bold tracking-tight">
           Commandes E-commerce

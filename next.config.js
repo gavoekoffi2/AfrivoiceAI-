@@ -11,6 +11,10 @@ const nextConfig = {
         protocol: "https",
         hostname: "storage.vapi.ai",
       },
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+      },
     ],
   },
   experimental: {

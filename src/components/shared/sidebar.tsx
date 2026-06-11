@@ -22,33 +22,33 @@ import { logoutAction } from "@/app/actions/auth";
 const mainNavItems = [
   {
     title: "Vue d'ensemble",
-    href: "/",
+    href: "/dashboard",
     icon: LayoutDashboard,
     exact: true,
   },
   {
-    title: "Commandes E-commerce",
-    href: "/e-commerce",
-    icon: ShoppingCart,
-  },
-  {
-    title: "Campagnes",
-    href: "/campaigns",
+    title: "Prospection B2B",
+    href: "/dashboard/campaigns",
     icon: Megaphone,
   },
   {
+    title: "Commandes E-commerce",
+    href: "/dashboard/e-commerce",
+    icon: ShoppingCart,
+  },
+  {
     title: "Appels",
-    href: "/calls",
+    href: "/dashboard/calls",
     icon: PhoneCall,
   },
   {
     title: "Wallet",
-    href: "/wallet",
+    href: "/dashboard/wallet",
     icon: Wallet,
   },
   {
     title: "Paramètres",
-    href: "/settings",
+    href: "/dashboard/settings",
     icon: Settings,
   },
 ];

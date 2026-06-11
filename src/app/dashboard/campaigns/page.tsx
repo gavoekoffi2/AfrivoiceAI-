@@ -129,7 +129,7 @@ export default async function CampaignsPage() {
                     size="sm"
                     className="w-full"
                   >
-                    <Link href={`/campaigns/${campaign.id}`}>
+                    <Link href={`/dashboard/campaigns/${campaign.id}`}>
                       Voir les détails
                     </Link>
                   </Button>

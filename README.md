@@ -2,9 +2,15 @@
 
 Plateforme SaaS d'appels vocaux par IA pour l'Afrique francophone :
 
+- **Prospection téléphonique B2B automatisée** (fonctionnalité phare) : importez vos leads en CSV, définissez un script, l'IA appelle, qualifie (qualifié / à rappeler / non intéressé / sans réponse), prend les rendez-vous et résume chaque conversation.
 - **Confirmation automatique des commandes COD** (paiement à la livraison) : une commande Shopify/WooCommerce arrive → l'IA appelle le client en français pour confirmer la commande et l'adresse → le statut est mis à jour automatiquement.
-- **Prospection téléphonique automatisée** : importez vos leads en CSV, définissez un script, l'IA appelle, qualifie et résume chaque conversation.
 - **Wallet en FCFA** : chaque appel est facturé au réel (coût API converti en FCFA + marge), avec historique des transactions.
+
+## Structure
+
+- `/` — landing page publique (animations CSS, démo d'appel simulée)
+- `/dashboard` — espace applicatif protégé (vue d'ensemble, campagnes, commandes, appels, wallet, paramètres)
+- `/login`, `/register` — authentification (Supabase)
 
 ## Stack
 
@@ -50,7 +56,7 @@ npm run db:push        # crée les tables dans Supabase
 npm run dev            # http://localhost:3000
 ```
 
-Créez un compte sur `/register` (organisation + wallet créés automatiquement), rechargez le wallet (simulation intégrée en attendant Mobile Money), et lancez vos premiers appels.
+Créez un compte sur `/register` (organisation + wallet créés automatiquement), rechargez le wallet (simulation intégrée en attendant Mobile Money), puis cliquez sur **« Tester un appel IA »** dans le dashboard : Amina vous appelle sur votre propre numéro — c'est le moyen le plus rapide de valider toute la chaîne (Vapi, voix, webhook, facturation).
 
 ## Configuration des webhooks (production)
 
@@ -94,3 +100,4 @@ npm run db:studio    # explorer la base
 - La recharge du wallet est une **simulation** (l'intégration Mobile Money / Stripe est prévue) — ne pas exposer en production payante sans la remplacer.
 - L'issue d'une commande (confirmée/annulée) est déduite par mots-clés du résumé d'appel ; vérifiez les commandes douteuses depuis le dashboard.
 - Le lancement de campagne appelle par lots de 5 (limite de durée des fonctions serverless) : relancez le bouton tant qu'il reste des leads.
+- Les photos de la landing sont servies depuis Unsplash (hotlink autorisé) ; remplacez-les par vos propres visuels de marque dans `src/app/page.tsx` quand vous en disposez.

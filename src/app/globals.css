@@ -74,3 +74,243 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
+
+/* ============================================================
+   Landing page — animations & effets premium
+   ============================================================ */
+
+@layer utilities {
+  /* --- Orbes lumineux flottants (profondeur 3D du hero) --- */
+  @keyframes orb-drift {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    33% {
+      transform: translate3d(40px, -30px, 0) scale(1.08);
+    }
+    66% {
+      transform: translate3d(-30px, 25px, 0) scale(0.95);
+    }
+  }
+
+  .orb {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(90px);
+    opacity: 0.5;
+    pointer-events: none;
+    animation: orb-drift 14s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  /* --- Flottement vertical doux (cartes 3D) --- */
+  @keyframes float-y {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-14px);
+    }
+  }
+  .animate-float {
+    animation: float-y 7s ease-in-out infinite;
+  }
+
+  /* --- Anneaux de sonnerie (appel entrant) --- */
+  @keyframes ring-pulse {
+    0% {
+      transform: scale(1);
+      opacity: 0.6;
+    }
+    100% {
+      transform: scale(2.2);
+      opacity: 0;
+    }
+  }
+  .ring-pulse::before,
+  .ring-pulse::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    border: 2px solid currentColor;
+    animation: ring-pulse 1.6s ease-out infinite;
+  }
+  .ring-pulse::after {
+    animation-delay: 0.8s;
+  }
+
+  /* --- Égaliseur vocal (barres qui dansent) --- */
+  @keyframes eq-bounce {
+    0%,
+    100% {
+      transform: scaleY(0.3);
+    }
+    50% {
+      transform: scaleY(1);
+    }
+  }
+  .eq-bar {
+    transform-origin: center;
+    animation: eq-bounce 0.9s ease-in-out infinite;
+  }
+
+  /* --- Points de frappe (l'IA "réfléchit") --- */
+  @keyframes typing-dot {
+    0%,
+    60%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.4;
+    }
+    30% {
+      transform: translateY(-4px);
+      opacity: 1;
+    }
+  }
+  .typing-dot {
+    animation: typing-dot 1s ease-in-out infinite;
+  }
+
+  /* --- Marquee infini (pays / langues) --- */
+  @keyframes marquee-x {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  .animate-marquee {
+    animation: marquee-x 32s linear infinite;
+  }
+  .marquee-mask {
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 8%,
+      black 92%,
+      transparent
+    );
+  }
+
+  /* --- Révélation au scroll --- */
+  .reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition:
+      opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: var(--reveal-delay, 0ms);
+    will-change: opacity, transform;
+  }
+  .reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* --- Dégradé animé (titres / CTA) --- */
+  @keyframes gradient-pan {
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient-pan 6s ease infinite;
+  }
+
+  /* --- Grille en perspective (sol 3D du hero) --- */
+  .grid-floor {
+    background-image:
+      linear-gradient(to right, rgba(139, 92, 246, 0.14) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(139, 92, 246, 0.14) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black, transparent);
+  }
+
+  /* --- Bande "kente" (identité africaine) --- */
+  .kente-stripe {
+    background: linear-gradient(
+      90deg,
+      #f59e0b 0 18%,
+      #8b5cf6 18% 38%,
+      #10b981 38% 56%,
+      #ef4444 56% 72%,
+      #f59e0b 72% 100%
+    );
+  }
+
+  /* --- Carte 3D inclinable --- */
+  .tilt-3d {
+    transform-style: preserve-3d;
+    transition: transform 0.25s ease-out;
+    will-change: transform;
+  }
+  .tilt-depth {
+    transform: translateZ(36px);
+  }
+
+  /* --- Halo conique tournant autour du téléphone --- */
+  @keyframes spin-slow {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .animate-spin-slow {
+    animation: spin-slow 14s linear infinite;
+  }
+
+  /* --- Ligne de progression des étapes --- */
+  @keyframes draw-line {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+  .is-visible .step-line {
+    animation: draw-line 1.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  .step-line {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+
+  /* --- FAQ détails animés --- */
+  details.faq-item summary::-webkit-details-marker {
+    display: none;
+  }
+  details.faq-item[open] .faq-chevron {
+    transform: rotate(180deg);
+  }
+  .faq-chevron {
+    transition: transform 0.3s ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .orb,
+    .animate-float,
+    .animate-marquee,
+    .animate-gradient,
+    .animate-spin-slow,
+    .eq-bar,
+    .typing-dot,
+    .ring-pulse::before,
+    .ring-pulse::after {
+      animation: none !important;
+    }
+    .reveal {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+}

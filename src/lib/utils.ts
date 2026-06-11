@@ -99,6 +99,25 @@ export function getCallStatusLabel(status: string): string {
 }
 
 /**
+ * Retourne le label du type d'un appel
+ */
+export function getCallTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    ecommerce_confirmation: "Confirmation commande",
+    prospecting: "Prospection",
+    test: "Appel de test",
+  };
+  return labels[type] ?? type;
+}
+
+/**
+ * Statuts d'appel considérés comme "en cours" (polling UI)
+ */
+export function isActiveCallStatus(status: string): boolean {
+  return status === "queued" || status === "ringing" || status === "in-progress";
+}
+
+/**
  * Retourne le label du statut d'une commande
  */
 export function getOrderStatusLabel(status: string): string {

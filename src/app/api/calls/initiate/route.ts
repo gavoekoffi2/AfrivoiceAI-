@@ -3,7 +3,11 @@ import { db } from "@/lib/db";
 import { orders } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getUserSession } from "@/lib/auth";
-import { initiateOrderCall, initiateLeadCallById } from "@/lib/calls/initiate";
+import {
+  initiateOrderCall,
+  initiateLeadCallById,
+  initiateTestCall,
+} from "@/lib/calls/initiate";
 
 export async function POST(req: Request) {
   try {
@@ -50,6 +54,21 @@ export async function POST(req: Request) {
       });
     }
 
+    if (body.testPhone) {
+      const result = await initiateTestCall({
+        organizationId: session.organizationId,
+        phone: String(body.testPhone),
+        name: typeof body.name === "string" ? body.name : undefined,
+      });
+      if (!result.ok) {
+        return NextResponse.json(
+          { error: result.error },
+          { status: result.status }
+        );
+      }
+      return NextResponse.json({ success: true, callId: result.vapiCallId });
+    }
+
     if (body.leadId && body.campaignId) {
       const result = await initiateLeadCallById(
         body.leadId,
@@ -67,7 +86,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       {
-        error: "Paramètres invalides : orderId ou (leadId + campaignId) requis",
+        error:
+          "Paramètres invalides : orderId, testPhone ou (leadId + campaignId) requis",
       },
       { status: 400 }
     );

@@ -40,10 +40,8 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  const protectedRoutes = ["/", "/e-commerce", "/campaigns", "/calls", "/wallet", "/settings"];
-  const isProtectedPage = protectedRoutes.some((route) =>
-    route === "/" ? pathname === "/" : pathname === route || pathname.startsWith(`${route}/`)
-  );
+  // L'espace applicatif vit sous /dashboard ; la landing "/" est publique
+  const isProtectedPage = pathname === "/dashboard" || pathname.startsWith("/dashboard/");
 
   // Protection des routes applicatives
   if (isProtectedPage && !user) {
@@ -62,7 +60,7 @@ export async function middleware(request: NextRequest) {
 
   // Redirection des utilisateurs connectés loin des pages d'auth
   if ((pathname === "/login" || pathname === "/register") && user) {
-    return NextResponse.redirect(new URL("/", request.url));
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return supabaseResponse;

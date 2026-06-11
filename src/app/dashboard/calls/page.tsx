@@ -21,8 +21,16 @@ import {
   TrendingUp,
   Filter,
 } from "lucide-react";
-import { formatFcfa, formatDuration, getCallStatusLabel } from "@/lib/utils";
+import {
+  formatFcfa,
+  formatDuration,
+  getCallStatusLabel,
+  getCallTypeLabel,
+  isActiveCallStatus,
+} from "@/lib/utils";
 import { CallsFilter } from "@/components/shared/calls-filter";
+import { AutoRefresh } from "@/components/shared/auto-refresh";
+import { TestCallDialog } from "@/components/shared/test-call-dialog";
 
 const callStatusColors: Record<
   string,
@@ -36,7 +44,7 @@ const callStatusColors: Record<
   ringing: "info",
 };
 
-const VALID_TYPES = ["ecommerce_confirmation", "prospecting"] as const;
+const VALID_TYPES = ["ecommerce_confirmation", "prospecting", "test"] as const;
 const VALID_STATUSES = [
   "completed",
   "failed",
@@ -110,17 +118,22 @@ export default async function CallsPage({
   );
 
   const hasFilters = Boolean(typeFilter || statusFilter);
+  const hasActiveCalls = allCalls.some((call) => isActiveCallStatus(call.status));
 
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
+      <AutoRefresh enabled={hasActiveCalls} />
       {/* En-tête */}
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">
-          Historique des appels
-        </h2>
-        <p className="text-muted-foreground">
-          Tous les appels passés via AfrivoiceAI — e-commerce et prospection
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">
+            Historique des appels
+          </h2>
+          <p className="text-muted-foreground">
+            Tous les appels passés via AfrivoiceAI — prospection et e-commerce
+          </p>
+        </div>
+        <TestCallDialog variant="outline" />
       </div>
 
       {/* Statistiques globales */}
@@ -209,7 +222,7 @@ export default async function CallsPage({
               </p>
               {hasFilters && (
                 <Button asChild variant="outline" size="sm" className="mt-3">
-                  <Link href="/calls">Effacer les filtres</Link>
+                  <Link href="/dashboard/calls">Effacer les filtres</Link>
                 </Button>
               )}
             </div>
@@ -218,7 +231,7 @@ export default async function CallsPage({
               {allCalls.map((call) => (
                 <Link
                   key={call.id}
-                  href={`/calls/${call.id}`}
+                  href={`/dashboard/calls/${call.id}`}
                   className="flex items-center justify-between rounded-lg border p-3 hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -232,10 +245,7 @@ export default async function CallsPage({
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-medium truncate">
-                          {call.summary ??
-                            (call.type === "ecommerce_confirmation"
-                              ? "Confirmation de commande"
-                              : "Appel de prospection")}
+                          {call.summary ?? getCallTypeLabel(call.type)}
                         </p>
                         <Badge
                           variant="outline"
@@ -243,6 +253,8 @@ export default async function CallsPage({
                         >
                           {call.type === "ecommerce_confirmation"
                             ? "E-commerce"
+                            : call.type === "test"
+                            ? "Test"
                             : "Prospection"}
                         </Badge>
                       </div>
@@ -297,7 +309,7 @@ export default async function CallsPage({
                   <Button asChild variant="outline" size="sm">
                     <Link
                       href={{
-                        pathname: "/calls",
+                        pathname: "/dashboard/calls",
                         query: {
                           ...(typeFilter && { type: typeFilter }),
                           ...(statusFilter && { status: statusFilter }),
@@ -313,7 +325,7 @@ export default async function CallsPage({
                   <Button asChild variant="outline" size="sm">
                     <Link
                       href={{
-                        pathname: "/calls",
+                        pathname: "/dashboard/calls",
                         query: {
                           ...(typeFilter && { type: typeFilter }),
                           ...(statusFilter && { status: statusFilter }),

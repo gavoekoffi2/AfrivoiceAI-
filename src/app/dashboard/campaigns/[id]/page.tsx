@@ -28,11 +28,15 @@ import {
   formatFcfa,
   formatDuration,
   getCallStatusLabel,
+  isActiveCallStatus,
   isUuid,
 } from "@/lib/utils";
 import { getCampaignLeadStats } from "@/lib/db/queries";
 import { LeadsImporter } from "@/components/shared/leads-importer";
 import { CampaignBatchCaller } from "@/components/shared/campaign-batch-caller";
+import { RequeueLeadsButton } from "@/components/shared/requeue-leads-button";
+import { LeadCallButton } from "@/components/shared/lead-call-button";
+import { AutoRefresh } from "@/components/shared/auto-refresh";
 
 export default async function CampaignDetailPage({
   params,
@@ -135,12 +139,17 @@ export default async function CampaignDetailPage({
     ringing: "info",
   };
 
+  const hasActiveCalls = campaignCalls.some((call) =>
+    isActiveCallStatus(call.status)
+  );
+
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
+      <AutoRefresh enabled={hasActiveCalls} />
       {/* Navigation */}
       <div className="flex items-center gap-3">
         <Button asChild variant="ghost" size="sm">
-          <Link href="/campaigns">
+          <Link href="/dashboard/campaigns">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Campagnes
           </Link>
@@ -170,11 +179,17 @@ export default async function CampaignDetailPage({
           </div>
           <p className="text-muted-foreground mt-1">{campaign.objective}</p>
         </div>
-        <CampaignBatchCaller
-          campaignId={campaign.id}
-          status={campaign.status}
-          pendingLeads={newLeads}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <RequeueLeadsButton
+            campaignId={campaign.id}
+            count={leadStats.noAnswer + leadStats.callback}
+          />
+          <CampaignBatchCaller
+            campaignId={campaign.id}
+            status={campaign.status}
+            pendingLeads={newLeads}
+          />
+        </div>
       </div>
 
       {/* Progression */}
@@ -306,22 +321,32 @@ export default async function CampaignDetailPage({
                         </p>
                       )}
                     </div>
-                    <Badge
-                      variant={statusColors[lead.status] ?? "secondary"}
-                      className="shrink-0 text-xs ml-2"
-                    >
-                      {lead.status === "new"
-                        ? "Nouveau"
-                        : lead.status === "called"
-                        ? "Appelé"
-                        : lead.status === "qualified"
-                        ? "Qualifié"
-                        : lead.status === "not_interested"
-                        ? "Non intéressé"
-                        : lead.status === "callback"
-                        ? "À rappeler"
-                        : "Sans réponse"}
-                    </Badge>
+                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                      <Badge
+                        variant={statusColors[lead.status] ?? "secondary"}
+                        className="shrink-0 text-xs"
+                      >
+                        {lead.status === "new"
+                          ? "Nouveau"
+                          : lead.status === "called"
+                          ? "Appelé"
+                          : lead.status === "qualified"
+                          ? "Qualifié"
+                          : lead.status === "not_interested"
+                          ? "Non intéressé"
+                          : lead.status === "callback"
+                          ? "À rappeler"
+                          : "Sans réponse"}
+                      </Badge>
+                      {["new", "callback", "no_answer"].includes(
+                        lead.status
+                      ) && (
+                        <LeadCallButton
+                          leadId={lead.id}
+                          campaignId={campaign.id}
+                        />
+                      )}
+                    </div>
                   </div>
                 ))
               )}
@@ -357,7 +382,7 @@ export default async function CampaignDetailPage({
               {campaignCalls.map((call) => (
                 <Link
                   key={call.id}
-                  href={`/calls/${call.id}`}
+                  href={`/dashboard/calls/${call.id}`}
                   className="flex items-center justify-between rounded-md border p-3 hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">

@@ -38,7 +38,7 @@ export async function createCampaignAction(formData: FormData) {
       })
       .returning();
 
-    revalidatePath("/campaigns");
+    revalidatePath("/dashboard/campaigns");
     return { success: true, campaign: result[0] };
   } catch (error) {
     console.error("[campaigns] Erreur création:", error);
@@ -64,11 +64,40 @@ export async function updateCampaignStatusAction(
         )
       );
 
-    revalidatePath("/campaigns");
+    revalidatePath("/dashboard/campaigns");
     return { success: true };
   } catch (error) {
     console.error("[campaigns] Erreur mise à jour statut:", error);
     return { error: "Erreur serveur." };
+  }
+}
+
+/**
+ * Remet en file d'attente les leads "sans réponse" et "à rappeler" pour une
+ * nouvelle vague d'appels.
+ */
+export async function requeueLeadsAction(campaignId: string) {
+  const session = await getUserSession();
+  if (!session) return { error: "Non autorisé" };
+
+  try {
+    const requeued = await db
+      .update(leads)
+      .set({ status: "new" })
+      .where(
+        and(
+          eq(leads.campaignId, campaignId),
+          eq(leads.organizationId, session.organizationId),
+          inArray(leads.status, ["no_answer", "callback"])
+        )
+      )
+      .returning({ id: leads.id });
+
+    revalidatePath(`/dashboard/campaigns/${campaignId}`);
+    return { success: true, count: requeued.length };
+  } catch (error) {
+    console.error("[campaigns] Erreur remise en file:", error);
+    return { error: "Erreur serveur lors de la remise en file." };
   }
 }
 
@@ -153,7 +182,7 @@ export async function importLeadsFromCsvAction(
         .where(eq(campaigns.id, campaignId));
     });
 
-    revalidatePath(`/campaigns/${campaignId}`);
+    revalidatePath(`/dashboard/campaigns/${campaignId}`);
     return {
       success: true,
       count: leadsToInsert.length,

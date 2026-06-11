@@ -22,8 +22,16 @@ import {
   getRecentCalls,
   getCallsChartData,
 } from "@/lib/db/queries";
-import { formatFcfa, formatDuration, getCallStatusLabel } from "@/lib/utils";
+import {
+  formatFcfa,
+  formatDuration,
+  getCallStatusLabel,
+  getCallTypeLabel,
+  isActiveCallStatus,
+} from "@/lib/utils";
 import { CallsChart } from "@/components/shared/calls-chart";
+import { TestCallDialog } from "@/components/shared/test-call-dialog";
+import { AutoRefresh } from "@/components/shared/auto-refresh";
 import { redirect } from "next/navigation";
 
 export default async function DashboardOverview() {
@@ -84,10 +92,15 @@ export default async function DashboardOverview() {
     ringing: "info",
   };
 
+  const hasActiveCalls = recentCalls.some((call) =>
+    isActiveCallStatus(call.status)
+  );
+
   return (
     <div className="flex-1 space-y-6 p-4 md:p-6 lg:p-8">
+      <AutoRefresh enabled={hasActiveCalls} />
       {/* En-tête */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold tracking-tight md:text-3xl">
             Tableau de bord
@@ -96,6 +109,7 @@ export default async function DashboardOverview() {
             Bienvenue sur AfrivoiceAI — {session.organizationName}
           </p>
         </div>
+        <TestCallDialog />
       </div>
 
       {/* Cartes KPI */}
@@ -165,7 +179,7 @@ export default async function DashboardOverview() {
               recentCalls.map((call) => (
                 <Link
                   key={call.id}
-                  href={`/calls/${call.id}`}
+                  href={`/dashboard/calls/${call.id}`}
                   className="flex items-center justify-between py-1 rounded px-1 hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-center gap-2 min-w-0">
@@ -174,9 +188,7 @@ export default async function DashboardOverview() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs font-medium truncate">
-                        {call.type === "ecommerce_confirmation"
-                          ? "Confirmation"
-                          : "Prospection"}
+                        {getCallTypeLabel(call.type)}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {call.durationSeconds
