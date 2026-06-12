@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { orders, calls, wallets, campaigns, leads, organizations } from "@/lib/db/schema";
@@ -24,6 +25,26 @@ function getCreatedCallId(callResponse: Vapi.CallsCreateResponse): string {
   }
 
   return firstCreatedCall.id;
+}
+
+function summarizeCallStartError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message.slice(0, 600);
+  }
+
+  if (typeof error === "string") {
+    return error.slice(0, 600);
+  }
+
+  try {
+    return JSON.stringify(error).slice(0, 600);
+  } catch {
+    return "Erreur inconnue au lancement de l'appel";
+  }
+}
+
+function createLocalFailedCallId(): string {
+  return `local_failed_${randomUUID()}`;
 }
 
 export async function POST(req: Request) {
@@ -210,14 +231,31 @@ async function initiateEcommerceCall(
     });
   } catch (vapiError) {
     console.error("[calls/initiate] Erreur Vapi:", vapiError);
-    // Réinitialiser le statut de la commande
-    await db
-      .update(orders)
-      .set({ status: "pending" })
-      .where(eq(orders.id, order.id));
+    const errorSummary = summarizeCallStartError(vapiError);
+
+    await db.transaction(async (tx) => {
+      await tx.insert(calls).values({
+        organizationId,
+        vapiCallId: createLocalFailedCallId(),
+        orderId: order.id,
+        type: "ecommerce_confirmation",
+        status: "failed",
+        summary: `Échec lancement Vapi : ${errorSummary}`,
+        endedReason: "vapi_create_failed",
+      });
+
+      await tx
+        .update(orders)
+        .set({ status: "pending" })
+        .where(eq(orders.id, order.id));
+    });
 
     return NextResponse.json(
-      { error: "Impossible de lancer l'appel via Vapi" },
+      {
+        error: "Impossible de lancer l'appel via Vapi",
+        details:
+          "L'échec a été enregistré dans l'historique des appels avec le statut failed.",
+      },
       { status: 503 }
     );
   }
@@ -338,8 +376,34 @@ async function initiateProspectingCall(
     return NextResponse.json({ success: true, callId: vapiCallId });
   } catch (vapiError) {
     console.error("[calls/initiate/prospecting] Erreur Vapi:", vapiError);
+    const errorSummary = summarizeCallStartError(vapiError);
+
+    await db.transaction(async (tx) => {
+      await tx.insert(calls).values({
+        organizationId,
+        vapiCallId: createLocalFailedCallId(),
+        leadId,
+        type: "prospecting",
+        status: "failed",
+        summary: `Échec lancement Vapi : ${errorSummary}`,
+        endedReason: "vapi_create_failed",
+      });
+
+      await tx
+        .update(leads)
+        .set({
+          status: "new",
+          notes: `Dernière tentative échouée : ${errorSummary}`,
+        })
+        .where(eq(leads.id, leadId));
+    });
+
     return NextResponse.json(
-      { error: "Impossible de lancer l'appel Vapi" },
+      {
+        error: "Impossible de lancer l'appel Vapi",
+        details:
+          "L'échec a été enregistré dans l'historique des appels avec le statut failed.",
+      },
       { status: 503 }
     );
   }
