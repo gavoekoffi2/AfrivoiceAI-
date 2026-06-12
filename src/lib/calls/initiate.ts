@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { db } from "@/lib/db";
 import {
   orders,
@@ -28,6 +29,20 @@ export type InitiateCallResult =
 
 // Statuts de commande pour lesquels un (nouvel) appel est autorisé
 const CALLABLE_ORDER_STATUSES = new Set(["pending", "no_answer"]);
+
+function summarizeCallStartError(error: unknown): string {
+  if (error instanceof Error) return error.message.slice(0, 600);
+  if (typeof error === "string") return error.slice(0, 600);
+  try {
+    return JSON.stringify(error).slice(0, 600);
+  } catch {
+    return "Erreur inconnue au lancement de l'appel";
+  }
+}
+
+function createLocalFailedCallId(): string {
+  return `local_failed_${randomUUID()}`;
+}
 
 async function getWalletBalance(organizationId: string) {
   const walletResult = await db
@@ -120,14 +135,30 @@ export async function initiateOrderCall(
     return { ok: true, vapiCallId };
   } catch (vapiError) {
     console.error("[calls/initiate] Erreur Vapi:", vapiError);
-    await db
-      .update(orders)
-      .set({ status: "pending" })
-      .where(eq(orders.id, order.id));
+    const errorSummary = summarizeCallStartError(vapiError);
+
+    await db.transaction(async (tx) => {
+      await tx.insert(calls).values({
+        organizationId: order.organizationId,
+        vapiCallId: createLocalFailedCallId(),
+        orderId: order.id,
+        type: "ecommerce_confirmation",
+        status: "failed",
+        summary: `Échec lancement Vapi : ${errorSummary}`,
+        endedReason: "vapi_create_failed",
+      });
+
+      await tx
+        .update(orders)
+        .set({ status: "pending" })
+        .where(eq(orders.id, order.id));
+    });
+
     return {
       ok: false,
       status: 503,
-      error: "Impossible de lancer l'appel via Vapi",
+      error:
+        "Impossible de lancer l'appel via Vapi. L'échec est enregistré dans l'historique des appels.",
     };
   }
 }
@@ -198,10 +229,33 @@ export async function initiateLeadCall(params: {
     return { ok: true, vapiCallId };
   } catch (vapiError) {
     console.error("[calls/initiate/prospecting] Erreur Vapi:", vapiError);
+    const errorSummary = summarizeCallStartError(vapiError);
+
+    await db.transaction(async (tx) => {
+      await tx.insert(calls).values({
+        organizationId: lead.organizationId,
+        vapiCallId: createLocalFailedCallId(),
+        leadId: lead.id,
+        type: "prospecting",
+        status: "failed",
+        summary: `Échec lancement Vapi : ${errorSummary}`,
+        endedReason: "vapi_create_failed",
+      });
+
+      await tx
+        .update(leads)
+        .set({
+          status: "new",
+          notes: `Dernière tentative échouée : ${errorSummary}`,
+        })
+        .where(eq(leads.id, lead.id));
+    });
+
     return {
       ok: false,
       status: 503,
-      error: "Impossible de lancer l'appel Vapi",
+      error:
+        "Impossible de lancer l'appel Vapi. L'échec est enregistré dans l'historique des appels.",
     };
   }
 }
@@ -284,11 +338,22 @@ Règles :
     return { ok: true, vapiCallId };
   } catch (vapiError) {
     console.error("[calls/test] Erreur Vapi:", vapiError);
+    const errorSummary = summarizeCallStartError(vapiError);
+
+    await db.insert(calls).values({
+      organizationId: params.organizationId,
+      vapiCallId: createLocalFailedCallId(),
+      type: "test",
+      status: "failed",
+      summary: `Échec lancement appel test Vapi : ${errorSummary}`,
+      endedReason: "vapi_create_failed",
+    });
+
     return {
       ok: false,
       status: 503,
       error:
-        "Impossible de lancer l'appel de test. Vérifiez la configuration Vapi (clé API et numéro).",
+        "Impossible de lancer l'appel de test. L'échec est enregistré dans l'historique des appels.",
     };
   }
 }
