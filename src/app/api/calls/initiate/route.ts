@@ -7,6 +7,7 @@ import {
   getVapiClient,
   generateEcommercePrompt,
   generateProspectingPrompt,
+  getFrenchElevenLabsVoice,
 } from "@/lib/vapi/client";
 import { hasSufficientBalance } from "@/lib/utils/billing";
 import { getUserSession } from "@/lib/auth";
@@ -187,11 +188,7 @@ async function initiateEcommerceCall(
           maxTokens: 250,
           temperature: 0.7,
         },
-        voice: {
-          provider: "11labs",
-          voiceId:
-            process.env.ELEVENLABS_VOICE_ID ?? "EXAVITQu4vr4xnSDxMaL",
-        },
+        voice: getFrenchElevenLabsVoice(),
         firstMessage: `Bonjour ${order.customerName}, c'est Amina de la boutique ${shopName}. Je vous appelle pour confirmer votre commande. Avez-vous quelques instants ?`,
         endCallMessage: "Merci beaucoup. Je vous souhaite une excellente journée.",
         artifactPlan: { recordingEnabled: true },
@@ -338,11 +335,7 @@ async function initiateProspectingCall(
           maxTokens: 300,
           temperature: 0.7,
         },
-        voice: {
-          provider: "11labs",
-          voiceId:
-            process.env.ELEVENLABS_VOICE_ID ?? "EXAVITQu4vr4xnSDxMaL",
-        },
+        voice: getFrenchElevenLabsVoice(),
         firstMessage: buildProspectingFirstMessage({
           leadName: lead.name,
           companyName: lead.company,

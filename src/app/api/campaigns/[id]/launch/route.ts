@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { campaigns, leads, calls, wallets } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { hasSufficientBalance } from "@/lib/utils/billing";
-import { getVapiClient, generateProspectingPrompt } from "@/lib/vapi/client";
+import { getFrenchElevenLabsVoice, getVapiClient, generateProspectingPrompt } from "@/lib/vapi/client";
 import { normalizePhoneNumber } from "@/lib/utils";
 import type { Vapi } from "@vapi-ai/server-sdk";
 import { buildProspectingFirstMessage } from "@/lib/prospecting";
@@ -161,10 +161,7 @@ export async function POST(
               maxTokens: 300,
               temperature: 0.7,
             },
-            voice: {
-              provider: "11labs",
-              voiceId: process.env.ELEVENLABS_VOICE_ID ?? "EXAVITQu4vr4xnSDxMaL",
-            },
+            voice: getFrenchElevenLabsVoice(),
             firstMessage: buildProspectingFirstMessage({
               leadName: lead.name,
               companyName: lead.company,

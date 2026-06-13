@@ -1,6 +1,39 @@
 import { VapiClient } from "@vapi-ai/server-sdk/Client";
+import type { Vapi } from "@vapi-ai/server-sdk";
 
 let vapiInstance: VapiClient | null = null;
+
+
+export function getFrenchElevenLabsVoice(): Vapi.CreateAssistantDtoVoice {
+  const voiceId =
+    process.env.ELEVENLABS_FRENCH_VOICE_ID ?? process.env.ELEVENLABS_VOICE_ID;
+
+  if (!voiceId) {
+    throw new Error(
+      "Voix française non configurée: définissez ELEVENLABS_FRENCH_VOICE_ID ou ELEVENLABS_VOICE_ID"
+    );
+  }
+
+  return {
+    provider: "11labs",
+    voiceId,
+    model: "eleven_turbo_v2_5",
+    language: "fr",
+    stability: 0.55,
+    similarityBoost: 0.8,
+    style: 0.25,
+    useSpeakerBoost: true,
+    optimizeStreamingLatency: 3,
+  };
+}
+
+const FRENCH_ACCENT_RULES = `
+Règles vocales obligatoires :
+- Parle en français uniquement, avec un accent français clair, neutre et professionnel.
+- Ne parle jamais avec une prononciation anglaise ou américaine.
+- Utilise des phrases courtes, naturelles, avec un rythme posé de centre d'appel professionnel.
+- Évite l'argot; reste chaleureux, poli et crédible pour une entreprise francophone.
+`;
 
 export function getVapiClient(): VapiClient {
   if (!vapiInstance) {
@@ -40,6 +73,7 @@ Instructions :
 5. Demande s'il sera disponible pour la livraison demain ou quel créneau convient
 6. Remercie chaleureusement et termine l'appel professionnellement
 
+${FRENCH_ACCENT_RULES}
 Règles importantes :
 - Parle uniquement en français
 - Sois concis, l'appel doit durer 1 à 3 minutes maximum
@@ -84,6 +118,7 @@ Cadre commercial B2B :
 - raison courte
 - prochain pas si applicable
 
+${FRENCH_ACCENT_RULES}
 Règles générales :
 - Parle uniquement en français
 - Sois professionnel, chaleureux, naturel et respectueux
