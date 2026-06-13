@@ -8,6 +8,7 @@ import { getVapiClient, generateProspectingPrompt } from "@/lib/vapi/client";
 import { normalizePhoneNumber } from "@/lib/utils";
 import type { Vapi } from "@vapi-ai/server-sdk";
 import { buildProspectingFirstMessage } from "@/lib/prospecting";
+import { randomUUID } from "crypto";
 
 const BATCH_DELAY_MS = 2000; // 2 secondes entre chaque appel
 
@@ -26,6 +27,20 @@ function getCreatedCallId(callResponse: Vapi.CallsCreateResponse): string {
   }
 
   return firstCreatedCall.id;
+}
+
+function summarizeCallStartError(error: unknown): string {
+  if (error instanceof Error) return error.message.slice(0, 600);
+  if (typeof error === "string") return error.slice(0, 600);
+  try {
+    return JSON.stringify(error).slice(0, 600);
+  } catch {
+    return "Erreur inconnue au lancement de l'appel";
+  }
+}
+
+function createLocalFailedCallId(): string {
+  return `local_failed_${randomUUID()}`;
 }
 
 export async function POST(
@@ -106,7 +121,8 @@ export async function POST(
 
     const vapi = getVapiClient();
     let launched = 0;
-    const errors: string[] = [];
+    let failed = 0;
+    const errors: Array<{ leadId: string; reason: string }> = [];
 
     for (const lead of pendingLeads) {
       try {
@@ -155,6 +171,11 @@ export async function POST(
             }),
             endCallMessage: "Merci pour votre temps. Je vous souhaite une excellente journée.",
             artifactPlan: { recordingEnabled: true },
+            transcriber: {
+              provider: "deepgram",
+              model: "nova-2",
+              language: "fr",
+            },
           },
         });
         const vapiCallId = getCreatedCallId(callResponse);
@@ -184,7 +205,30 @@ export async function POST(
         }
       } catch (err) {
         console.error(`[batch/launch] Erreur pour lead ${lead.id}:`, err);
-        errors.push(lead.id);
+        failed++;
+        const reason = summarizeCallStartError(err);
+        errors.push({ leadId: lead.id, reason });
+
+        // Rendre l'échec visible dans l'historique et garder le lead relançable.
+        await db.transaction(async (tx) => {
+          await tx.insert(calls).values({
+            organizationId: session.organizationId,
+            vapiCallId: createLocalFailedCallId(),
+            leadId: lead.id,
+            type: "prospecting",
+            status: "failed",
+            summary: `Échec lancement Vapi : ${reason}`,
+            endedReason: "vapi_create_failed",
+          });
+
+          await tx
+            .update(leads)
+            .set({
+              status: "new",
+              notes: `Dernier lancement échoué : ${reason}`,
+            })
+            .where(eq(leads.id, lead.id));
+        });
       }
     }
 
@@ -196,11 +240,16 @@ export async function POST(
 
     return NextResponse.json({
       launched,
-      errors: errors.length,
-      message: `${launched} appel(s) lancé(s) avec succès.`,
+      failed,
+      errors,
+      message:
+        failed > 0
+          ? `${launched} appel(s) lancé(s), ${failed} échec(s) enregistrés dans l'historique.`
+          : `${launched} appel(s) lancé(s) avec succès.`,
     });
   } catch (error) {
     console.error("[batch/launch] Erreur:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
+
