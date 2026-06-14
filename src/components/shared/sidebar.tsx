@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   ShoppingCart,
   Megaphone,
+  Database,
   Wallet,
   Settings,
   PhoneCall,
@@ -35,6 +36,11 @@ const mainNavItems = [
     title: "Campagnes",
     href: "/campaigns",
     icon: Megaphone,
+  },
+  {
+    title: "Bases prospects",
+    href: "/lead-databases",
+    icon: Database,
   },
   {
     title: "Appels",

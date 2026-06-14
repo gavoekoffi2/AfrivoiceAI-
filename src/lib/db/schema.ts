@@ -7,6 +7,8 @@ import {
   jsonb,
   decimal,
   index,
+  boolean,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // 1. Gestion des Utilisateurs et Organisations (Multi-tenant)
@@ -141,7 +143,105 @@ export const leads = pgTable(
   })
 );
 
-// 5. Historique des Appels (Vapi)
+// 5. Marketplace de bases de prospects premium
+export const leadDatabases = pgTable(
+  "lead_databases",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    slug: text("slug").unique().notNull(),
+    sector: text("sector").notNull(),
+    country: text("country").default("TG").notNull(),
+    city: text("city"),
+    description: text("description").notNull(),
+    priceFcfa: decimal("price_fcfa", { precision: 12, scale: 2 })
+      .default("0")
+      .notNull(),
+    recordCount: integer("record_count").default(0).notNull(),
+    qualityScore: integer("quality_score").default(0).notNull(),
+    dataSource: text("data_source").default("Sources publiques B2B").notNull(),
+    allowedUsage: text("allowed_usage")
+      .default("Prospection B2B responsable à partir de données publiques professionnelles.")
+      .notNull(),
+    sampleRecords: jsonb("sample_records"),
+    isPublished: boolean("is_published").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    sectorIdx: index("lead_databases_sector_idx").on(table.sector),
+    publishedIdx: index("lead_databases_published_idx").on(table.isPublished),
+  })
+);
+
+export const leadDatabaseRecords = pgTable(
+  "lead_database_records",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    databaseId: uuid("database_id")
+      .references(() => leadDatabases.id, { onDelete: "cascade" })
+      .notNull(),
+    companyName: text("company_name").notNull(),
+    contactName: text("contact_name"),
+    sector: text("sector"),
+    country: text("country").default("TG").notNull(),
+    city: text("city"),
+    phone: text("phone"),
+    email: text("email"),
+    website: text("website"),
+    address: text("address"),
+    sourceUrl: text("source_url"),
+    sourceName: text("source_name"),
+    opportunityScore: integer("opportunity_score").default(0).notNull(),
+    priorityBand: text("priority_band").default("C").notNull(),
+    recommendedOffer: text("recommended_offer"),
+    outreachAngle: text("outreach_angle"),
+    aiEmail: text("ai_email"),
+    aiCallScript: text("ai_call_script"),
+    rawPayload: jsonb("raw_payload"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    databaseIdx: index("lead_database_records_database_idx").on(table.databaseId),
+    cityIdx: index("lead_database_records_city_idx").on(table.city),
+    scoreIdx: index("lead_database_records_score_idx").on(table.opportunityScore),
+    recordUnique: uniqueIndex("lead_database_records_database_company_phone_unique").on(
+      table.databaseId,
+      table.companyName,
+      table.phone
+    ),
+  })
+);
+
+export const leadDatabasePurchases = pgTable(
+  "lead_database_purchases",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .references(() => organizations.id, { onDelete: "cascade" })
+      .notNull(),
+    databaseId: uuid("database_id")
+      .references(() => leadDatabases.id, { onDelete: "cascade" })
+      .notNull(),
+    amountFcfa: decimal("amount_fcfa", { precision: 12, scale: 2 })
+      .default("0")
+      .notNull(),
+    accessLevel: text("access_level").default("full").notNull(),
+    exportAllowed: boolean("export_allowed").default(true).notNull(),
+    campaignAllowed: boolean("campaign_allowed").default(true).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    orgIdx: index("lead_database_purchases_org_idx").on(table.organizationId),
+    databaseIdx: index("lead_database_purchases_database_idx").on(table.databaseId),
+    orgDatabaseUnique: uniqueIndex("lead_database_purchases_org_database_unique").on(
+      table.organizationId,
+      table.databaseId
+    ),
+  })
+);
+
+// 6. Historique des Appels (Vapi)
 export const calls = pgTable(
   "calls",
   {
@@ -188,5 +288,11 @@ export type Campaign = typeof campaigns.$inferSelect;
 export type NewCampaign = typeof campaigns.$inferInsert;
 export type Lead = typeof leads.$inferSelect;
 export type NewLead = typeof leads.$inferInsert;
+export type LeadDatabase = typeof leadDatabases.$inferSelect;
+export type NewLeadDatabase = typeof leadDatabases.$inferInsert;
+export type LeadDatabaseRecord = typeof leadDatabaseRecords.$inferSelect;
+export type NewLeadDatabaseRecord = typeof leadDatabaseRecords.$inferInsert;
+export type LeadDatabasePurchase = typeof leadDatabasePurchases.$inferSelect;
+export type NewLeadDatabasePurchase = typeof leadDatabasePurchases.$inferInsert;
 export type Call = typeof calls.$inferSelect;
 export type NewCall = typeof calls.$inferInsert;
