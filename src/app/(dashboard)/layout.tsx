@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { getUserSession } from "@/lib/auth";
 import { getOrganizationStats } from "@/lib/db/queries";
 import { Sidebar } from "@/components/shared/sidebar";
@@ -12,7 +11,7 @@ export default async function DashboardLayout({
   const session = await getUserSession();
 
   if (!session) {
-    redirect("/login");
+    return <>{children}</>;
   }
 
   const stats = await getOrganizationStats(session.organizationId);

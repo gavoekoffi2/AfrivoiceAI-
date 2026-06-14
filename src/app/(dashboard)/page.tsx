@@ -24,11 +24,11 @@ import {
 } from "@/lib/db/queries";
 import { formatFcfa, formatDuration, getCallStatusLabel } from "@/lib/utils";
 import { CallsChart } from "@/components/shared/calls-chart";
-import { redirect } from "next/navigation";
+import { PublicLandingPage } from "@/components/shared/public-landing-page";
 
 export default async function DashboardOverview() {
   const session = await getUserSession();
-  if (!session) redirect("/login");
+  if (!session) return <PublicLandingPage />;
 
   const [stats, recentCalls, chartData] = await Promise.all([
     getOrganizationStats(session.organizationId),
