@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { formatFcfa, formatDuration, getCallStatusLabel } from "@/lib/utils";
 import { LeadsImporter } from "@/components/shared/leads-importer";
+import { ManualLeadForm } from "@/components/shared/manual-lead-form";
 import { CampaignBatchCaller } from "@/components/shared/campaign-batch-caller";
 
 export default async function CampaignDetailPage({
@@ -241,7 +242,23 @@ export default async function CampaignDetailPage({
         ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Ajout manuel */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              Ajouter un prospect
+            </CardTitle>
+            <CardDescription>
+              Saisissez un contact manuellement sans fichier CSV.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ManualLeadForm campaignId={campaign.id} />
+          </CardContent>
+        </Card>
+
         {/* Import de leads */}
         <Card>
           <CardHeader>

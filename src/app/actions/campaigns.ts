@@ -72,10 +72,21 @@ export async function updateCampaignStatusAction(
   }
 }
 
-export async function importLeadsFromCsvAction(
-  campaignId: string,
-  leadsData: Array<{ name?: string; phone: string; company?: string; email?: string }>
-) {
+type LeadInput = {
+  name?: string;
+  phone: string;
+  company?: string;
+  email?: string;
+  notes?: string;
+};
+
+function cleanOptional(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const cleaned = value.trim();
+  return cleaned ? cleaned : undefined;
+}
+
+async function addLeadsToCampaign(campaignId: string, leadsData: LeadInput[]) {
   const session = await getUserSession();
   if (!session) return { error: "Non autorisé" };
 
@@ -87,7 +98,6 @@ export async function importLeadsFromCsvAction(
     return { error: "Import limité à 500 leads par envoi pour éviter les abus." };
   }
 
-  // Vérifier que la campagne appartient à l'organisation
   const campaign = await db.query.campaigns.findFirst({
     where: and(
       eq(campaigns.id, campaignId),
@@ -100,8 +110,11 @@ export async function importLeadsFromCsvAction(
   try {
     const normalizedLeads = leadsData
       .map((lead) => ({
-        ...lead,
-        phone: normalizePhoneNumber(lead.phone, "TG") ?? lead.phone,
+        name: cleanOptional(lead.name),
+        phone: normalizePhoneNumber(lead.phone, "TG") ?? lead.phone.trim(),
+        company: cleanOptional(lead.company),
+        email: cleanOptional(lead.email),
+        notes: cleanOptional(lead.notes),
       }))
       .filter((lead) => lead.phone.startsWith("+"));
 
@@ -137,6 +150,7 @@ export async function importLeadsFromCsvAction(
         phone: lead.phone,
         company: lead.company,
         email: lead.email,
+        notes: lead.notes,
         status: "new" as const,
       }));
 
@@ -154,13 +168,39 @@ export async function importLeadsFromCsvAction(
     });
 
     revalidatePath(`/campaigns/${campaignId}`);
+    revalidatePath("/campaigns");
     return {
       success: true,
       count: leadsToInsert.length,
       skipped: leadsData.length - leadsToInsert.length,
     };
   } catch (error) {
-    console.error("[campaigns] Erreur import leads:", error);
-    return { error: "Erreur lors de l'import des leads." };
+    console.error("[campaigns] Erreur ajout leads:", error);
+    return { error: "Erreur lors de l'ajout des leads." };
   }
+}
+
+export async function addManualLeadAction(
+  campaignId: string,
+  formData: FormData
+) {
+  const phone = cleanOptional(formData.get("phone"));
+  if (!phone) return { error: "Le numéro de téléphone est obligatoire." };
+
+  return addLeadsToCampaign(campaignId, [
+    {
+      name: cleanOptional(formData.get("name")),
+      phone,
+      company: cleanOptional(formData.get("company")),
+      email: cleanOptional(formData.get("email")),
+      notes: cleanOptional(formData.get("notes")),
+    },
+  ]);
+}
+
+export async function importLeadsFromCsvAction(
+  campaignId: string,
+  leadsData: Array<{ name?: string; phone: string; company?: string; email?: string }>
+) {
+  return addLeadsToCampaign(campaignId, leadsData);
 }
