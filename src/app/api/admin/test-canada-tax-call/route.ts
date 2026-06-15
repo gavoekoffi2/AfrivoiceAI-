@@ -32,20 +32,25 @@ function getCreatedCallId(callResponse: Vapi.CallsCreateResponse): string {
 
 function getFrenchVoice(): Vapi.CreateAssistantDtoVoice {
   const voiceId = process.env.ELEVENLABS_FRENCH_VOICE_ID ?? process.env.ELEVENLABS_VOICE_ID;
-  if (!voiceId) {
-    throw new Error("Voix française ElevenLabs non configurée");
+  if (voiceId) {
+    return {
+      provider: "11labs",
+      voiceId,
+      model: "eleven_turbo_v2_5",
+      language: "fr",
+      stability: 0.55,
+      similarityBoost: 0.8,
+      style: 0.25,
+      useSpeakerBoost: true,
+      optimizeStreamingLatency: 3,
+    };
   }
 
   return {
-    provider: "11labs",
-    voiceId,
-    model: "eleven_turbo_v2_5",
-    language: "fr",
-    stability: 0.55,
-    similarityBoost: 0.8,
-    style: 0.25,
-    useSpeakerBoost: true,
-    optimizeStreamingLatency: 3,
+    provider: "vapi",
+    voiceId: "Elliot",
+    language: "fr-CA",
+    speed: 0.95,
   };
 }
 
