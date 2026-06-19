@@ -5,6 +5,7 @@ import { eq, sql } from "drizzle-orm";
 import { verifyVapiWebhook } from "@/lib/vapi/verify";
 import { calculateClientCostFcfa } from "@/lib/utils/billing";
 import { classifyProspectingOutcome } from "@/lib/prospecting";
+import { extractVapiCallArtifacts } from "@/lib/vapi/artifacts";
 
 interface VapiEndOfCallReport {
   message: {
@@ -19,6 +20,9 @@ interface VapiEndOfCallReport {
     recordingUrl?: string;
     transcript?: string;
     summary?: string;
+    artifact?: Record<string, unknown>;
+    analysis?: Record<string, unknown>;
+    messages?: unknown[];
   };
 }
 
@@ -103,9 +107,11 @@ export async function POST(req: Request) {
 
     // Rapport de fin d'appel
     if (type === "end-of-call-report") {
-      const { call, recordingUrl, transcript, summary } = (
+      const { call } = (
         payload as VapiEndOfCallReport
       ).message;
+      const { recordingUrl, transcript, summary, messages, rawArtifact } =
+        extractVapiCallArtifacts((payload as VapiEndOfCallReport).message);
 
       // Récupérer l'appel en base
       const callResult = await db
@@ -152,6 +158,8 @@ export async function POST(req: Request) {
             recordingUrl: recordingUrl ?? null,
             transcript: transcript ?? null,
             summary: summary ?? null,
+            callMessages: messages ?? null,
+            callArtifact: rawArtifact ?? null,
             endedReason: call.endedReason ?? null,
           })
           .where(eq(calls.id, dbCall.id));

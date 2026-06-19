@@ -27,6 +27,7 @@ import {
   CheckCircle,
   XCircle,
   Info,
+  MessageSquare,
 } from "lucide-react";
 import {
   formatFcfa,
@@ -158,6 +159,26 @@ export default async function CallDetailPage({
               <CardContent>
                 <div className="rounded-md bg-muted/50 p-4 text-sm leading-relaxed">
                   {call.summary}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Conversation structurée */}
+          {Array.isArray(call.callMessages) && call.callMessages.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <MessageSquare className="h-5 w-5 text-primary" />
+                  Conversation agent/client
+                </CardTitle>
+                <CardDescription>
+                  Tout ce qui s&apos;est dit pendant l&apos;appel, séparé par intervenant
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="max-h-[32rem] overflow-y-auto rounded-md border bg-muted/20 p-4">
+                  <StructuredMessagesViewer messages={call.callMessages} />
                 </div>
               </CardContent>
             </Card>
@@ -368,6 +389,58 @@ export default async function CallDetailPage({
           </Card>
         </div>
       </div>
+    </div>
+  );
+}
+
+type StructuredCallMessage = {
+  speaker?: "assistant" | "client" | "system" | "unknown";
+  text?: string;
+  role?: string;
+  timestamp?: string;
+  secondsFromStart?: number;
+};
+
+function StructuredMessagesViewer({ messages }: { messages: StructuredCallMessage[] }) {
+  return (
+    <div className="space-y-3">
+      {messages
+        .filter((message) => typeof message.text === "string" && message.text.trim())
+        .map((message, i) => {
+          const isAssistant = message.speaker === "assistant";
+          const isClient = message.speaker === "client";
+          const label = isAssistant ? "IA" : isClient ? "Client" : "Info";
+          const align = isAssistant ? "flex-row" : isClient ? "flex-row-reverse" : "flex-row";
+          const bubbleClass = isAssistant
+            ? "bg-primary/10 text-foreground"
+            : isClient
+            ? "bg-secondary text-secondary-foreground"
+            : "bg-muted text-muted-foreground";
+
+          return (
+            <div key={i} className={`flex gap-3 ${align}`}>
+              <div
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                  isAssistant
+                    ? "bg-primary text-primary-foreground"
+                    : isClient
+                    ? "bg-secondary text-secondary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {label}
+              </div>
+              <div className={`max-w-[82%] rounded-lg px-3 py-2 text-sm ${bubbleClass}`}>
+                {(message.timestamp || typeof message.secondsFromStart === "number") && (
+                  <p className="mb-1 text-[10px] opacity-70">
+                    {message.timestamp ?? `${Math.round(message.secondsFromStart ?? 0)}s`}
+                  </p>
+                )}
+                <p className="whitespace-pre-wrap leading-relaxed">{message.text}</p>
+              </div>
+            </div>
+          );
+        })}
     </div>
   );
 }

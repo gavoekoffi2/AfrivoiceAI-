@@ -262,6 +262,16 @@ export const calls = pgTable(
     recordingUrl: text("recording_url"),
     transcript: text("transcript"),
     summary: text("summary"),
+    callMessages: jsonb("call_messages").$type<
+      Array<{
+        speaker: "assistant" | "client" | "system" | "unknown";
+        text: string;
+        role?: string;
+        timestamp?: string;
+        secondsFromStart?: number;
+      }>
+    >(),
+    callArtifact: jsonb("call_artifact").$type<Record<string, unknown>>(),
     endedReason: text("ended_reason"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
