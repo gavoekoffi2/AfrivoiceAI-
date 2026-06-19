@@ -46,6 +46,20 @@ export function getVapiClient(): VapiClient {
   return vapiInstance;
 }
 
+export function getVapiWebhookServer(): Vapi.Server | undefined {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  if (!siteUrl) return undefined;
+
+  const webhookUrl = new URL("/api/webhooks/vapi", siteUrl).toString();
+  const secret = process.env.VAPI_WEBHOOK_SECRET;
+
+  return {
+    url: webhookUrl,
+    timeoutSeconds: 20,
+    ...(secret ? { secret } : {}),
+  };
+}
+
 /**
  * Génère le prompt système pour la confirmation de commande e-commerce
  */

@@ -8,6 +8,7 @@ import {
   generateEcommercePrompt,
   generateProspectingPrompt,
   getFrenchElevenLabsVoice,
+  getVapiWebhookServer,
 } from "@/lib/vapi/client";
 import { hasSufficientBalance } from "@/lib/utils/billing";
 import { getUserSession } from "@/lib/auth";
@@ -180,6 +181,7 @@ async function initiateEcommerceCall(
         name: order.customerName,
       },
       assistant: {
+        server: getVapiWebhookServer(),
         model: {
           provider: "google",
           model: "gemini-1.5-flash",
@@ -327,6 +329,7 @@ async function initiateProspectingCall(
         name: lead.name ?? undefined,
       },
       assistant: {
+        server: getVapiWebhookServer(),
         model: {
           provider: "google",
           model: "gemini-1.5-flash",
