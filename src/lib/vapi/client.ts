@@ -4,33 +4,37 @@ import type { Vapi } from "@vapi-ai/server-sdk";
 let vapiInstance: VapiClient | null = null;
 
 
-export function getFrenchElevenLabsVoice(): Vapi.CreateAssistantDtoVoice {
-  const voiceId =
-    process.env.ELEVENLABS_FRENCH_VOICE_ID ?? process.env.ELEVENLABS_VOICE_ID;
+export function getFrenchVoice(): Vapi.CreateAssistantDtoVoice {
+  const elevenLabsFrenchVoiceId = process.env.ELEVENLABS_FRENCH_VOICE_ID;
 
-  if (!voiceId) {
-    throw new Error(
-      "Voix française non configurée: définissez ELEVENLABS_FRENCH_VOICE_ID ou ELEVENLABS_VOICE_ID"
-    );
+  if (elevenLabsFrenchVoiceId) {
+    return {
+      provider: "11labs",
+      voiceId: elevenLabsFrenchVoiceId,
+      model: "eleven_turbo_v2_5",
+      language: "fr",
+      stability: 0.6,
+      similarityBoost: 0.85,
+      style: 0.2,
+      useSpeakerBoost: true,
+      optimizeStreamingLatency: 3,
+    };
   }
 
   return {
-    provider: "11labs",
-    voiceId,
-    model: "eleven_turbo_v2_5",
-    language: "fr",
-    stability: 0.55,
-    similarityBoost: 0.8,
-    style: 0.25,
-    useSpeakerBoost: true,
-    optimizeStreamingLatency: 3,
+    provider: "azure",
+    voiceId: process.env.AZURE_FRENCH_VOICE_ID ?? "fr-FR-DeniseNeural",
+    speed: 0.95,
   };
 }
 
+export const getFrenchElevenLabsVoice = getFrenchVoice;
+
 const FRENCH_ACCENT_RULES = `
 Règles vocales obligatoires :
-- Parle en français uniquement, avec un accent français clair, neutre et professionnel.
-- Ne parle jamais avec une prononciation anglaise ou américaine.
+- Parle en français uniquement, avec une voix française/francophone claire, neutre et professionnelle.
+- Utilise une prononciation de français standard, naturelle, sans accent anglais ou américain.
+- Évite l'accent canadien trop marqué; vise un français international facile à comprendre en Afrique francophone.
 - Utilise des phrases courtes, naturelles, avec un rythme posé de centre d'appel professionnel.
 - Évite l'argot; reste chaleureux, poli et crédible pour une entreprise francophone.
 `;
