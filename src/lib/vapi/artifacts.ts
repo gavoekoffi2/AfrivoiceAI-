@@ -94,7 +94,9 @@ function findMessages(root: unknown): NormalizedCallMessage[] | null {
     if (!Array.isArray(candidate)) continue;
     const normalized = candidate
       .map(normalizeMessage)
-      .filter((message): message is NormalizedCallMessage => Boolean(message));
+      .filter((message): message is NormalizedCallMessage =>
+        Boolean(message && message.speaker !== "system")
+      );
     if (normalized.length > 0) return normalized;
   }
 

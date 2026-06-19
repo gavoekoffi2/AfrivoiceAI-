@@ -21,6 +21,7 @@ describe("extractVapiCallArtifacts", () => {
       artifact: {
         recordingUrl: "https://cdn.example.com/nested.wav",
         messages: [
+          { role: "system", message: "Instruction interne à ne jamais afficher." },
           { role: "assistant", message: "Bonjour, ici AfriVoice AI." },
           { role: "user", message: "Je veux comprendre le prix." },
           { role: "assistant", content: "Je peux vous expliquer." },

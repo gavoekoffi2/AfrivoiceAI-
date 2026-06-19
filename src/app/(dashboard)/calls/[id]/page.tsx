@@ -405,7 +405,12 @@ function StructuredMessagesViewer({ messages }: { messages: StructuredCallMessag
   return (
     <div className="space-y-3">
       {messages
-        .filter((message) => typeof message.text === "string" && message.text.trim())
+        .filter(
+          (message) =>
+            message.speaker !== "system" &&
+            typeof message.text === "string" &&
+            message.text.trim()
+        )
         .map((message, i) => {
           const isAssistant = message.speaker === "assistant";
           const isClient = message.speaker === "client";
