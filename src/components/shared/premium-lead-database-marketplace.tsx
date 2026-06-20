@@ -61,6 +61,8 @@ const COUNTRY_META: Record<string, { name: string; flag: string; accent: string 
   TG: { name: "Togo", flag: "🇹🇬", accent: "from-emerald-400/30 to-lime-400/10" },
   CM: { name: "Cameroun", flag: "🇨🇲", accent: "from-amber-400/30 to-emerald-400/10" },
   BJ: { name: "Bénin", flag: "🇧🇯", accent: "from-yellow-400/30 to-rose-400/10" },
+  CI: { name: "Côte d’Ivoire", flag: "🇨🇮", accent: "from-orange-400/30 to-emerald-400/10" },
+  SN: { name: "Sénégal", flag: "🇸🇳", accent: "from-lime-400/25 to-amber-400/10" },
 };
 
 function formatFcfa(value: string | number) {
@@ -177,8 +179,9 @@ export function PremiumLeadDatabaseMarketplace({ databases }: MarketplaceProps) 
                   Bases de prospects classées par pays et par domaine.
                 </h1>
                 <p className="max-w-2xl text-base leading-7 text-[#a7adb8] md:text-lg">
-                  Le client choisit un pays, filtre par secteur, recherche une base précise,
-                  achète l&apos;accès puis transforme la base en campagne AfrivoiceAI.
+                  Catalogue rapide avec filtres par pays, domaine et recherche instantanée.
+                  Les bases Côte d’Ivoire sont maintenant séparées par secteur pour éviter les pages lourdes
+                  et permettre un chargement plus stable.
                 </p>
               </div>
 

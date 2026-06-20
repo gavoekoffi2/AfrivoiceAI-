@@ -7,6 +7,10 @@ export type UserSession = {
   id: string;
   email: string;
   role: string;
+  subscriptionPlan: string;
+  subscriptionExpiresAt: Date | null;
+  isActive: boolean;
+  adminPermissions: string[] | null;
   organizationId: string;
   organizationName: string;
 };
@@ -26,6 +30,10 @@ export async function getUserSession(): Promise<UserSession | null> {
         id: users.id,
         email: users.email,
         role: users.role,
+        subscriptionPlan: users.subscriptionPlan,
+        subscriptionExpiresAt: users.subscriptionExpiresAt,
+        isActive: users.isActive,
+        adminPermissions: users.adminPermissions,
         organizationId: users.organizationId,
         organizationName: organizations.name,
       })
@@ -34,7 +42,15 @@ export async function getUserSession(): Promise<UserSession | null> {
       .where(eq(users.id, authUser.id))
       .limit(1);
 
-    return result[0] ?? null;
+    const session = result[0];
+    if (!session || !session.isActive) return null;
+
+    return {
+      ...session,
+      adminPermissions: Array.isArray(session.adminPermissions)
+        ? (session.adminPermissions as string[])
+        : null,
+    };
   } catch (error) {
     console.error("[auth] Erreur lors de la récupération de session:", error);
     return null;

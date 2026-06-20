@@ -164,6 +164,11 @@ export default async function CampaignDetailPage({
                 ? "Terminée"
                 : "Brouillon"}
             </Badge>
+            <Badge variant="outline">
+              {campaign.voiceLanguage === "ewe"
+                ? "Voix Éwé / langue locale"
+                : "Voix française"}
+            </Badge>
           </div>
           <p className="text-muted-foreground mt-1">{campaign.objective}</p>
         </div>

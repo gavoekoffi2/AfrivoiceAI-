@@ -9,6 +9,7 @@
     "lint": "next lint",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "tts:ewe:demo": ".venv-african-tts/bin/python scripts/african_tts/generate_ewe_demo.py",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",

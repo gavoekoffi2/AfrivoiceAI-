@@ -9,6 +9,7 @@ import {
   Database,
   Wallet,
   Settings,
+  ShieldCheck,
   PhoneCall,
   Mic2,
   Globe,
@@ -48,6 +49,16 @@ const mainNavItems = [
     icon: PhoneCall,
   },
   {
+    title: "Voix africaines",
+    href: "/african-voices",
+    icon: Mic2,
+  },
+  {
+    title: "Clonage voix",
+    href: "/voice-cloning",
+    icon: Mic2,
+  },
+  {
     title: "Wallet",
     href: "/wallet",
     icon: Wallet,
@@ -59,16 +70,19 @@ const mainNavItems = [
   },
 ];
 
+const adminNavItems = [
+  {
+    title: "Super administration",
+    href: "/admin",
+    icon: ShieldCheck,
+  },
+];
+
 const comingSoonItems = [
   {
     title: "Marketplace de Voix",
     icon: Mic2,
     description: "Voix africaines authentiques",
-  },
-  {
-    title: "Clonage Vocal",
-    icon: PhoneCall,
-    description: "Clonez votre propre voix",
   },
   {
     title: "Langues Locales",
@@ -80,10 +94,12 @@ const comingSoonItems = [
 interface SidebarProps {
   organizationName: string;
   userEmail: string;
+  userRole: string;
 }
 
-export function Sidebar({ organizationName, userEmail }: SidebarProps) {
+export function Sidebar({ organizationName, userEmail, userRole }: SidebarProps) {
   const pathname = usePathname();
+  const showAdmin = userRole === "super_admin" || userRole === "admin";
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -133,6 +149,37 @@ export function Sidebar({ organizationName, userEmail }: SidebarProps) {
             </Link>
           );
         })}
+
+        {showAdmin && (
+          <>
+            <Separator className="bg-sidebar-border my-3" />
+            <p className="px-2 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/40 mb-2">
+              Administration
+            </p>
+            {adminNavItems.map((item) => {
+              const isActive = pathname.startsWith(item.href);
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                    isActive
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                  )}
+                >
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  <span>{item.title}</span>
+                  {isActive && (
+                    <ChevronRight className="ml-auto h-3 w-3 opacity-50" />
+                  )}
+                </Link>
+              );
+            })}
+          </>
+        )}
 
         <Separator className="bg-sidebar-border my-3" />
 

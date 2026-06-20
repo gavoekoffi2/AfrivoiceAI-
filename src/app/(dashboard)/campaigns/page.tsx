@@ -98,10 +98,15 @@ export default async function CampaignsPage() {
                     <CardTitle className="text-base line-clamp-1">
                       {campaign.name}
                     </CardTitle>
-                    <Badge variant={config.variant} className="shrink-0 gap-1">
-                      <StatusIcon className="h-3 w-3" />
-                      {config.label}
-                    </Badge>
+                    <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
+                      <Badge variant={config.variant} className="gap-1">
+                        <StatusIcon className="h-3 w-3" />
+                        {config.label}
+                      </Badge>
+                      <Badge variant="outline">
+                        {campaign.voiceLanguage === "ewe" ? "Éwé/local" : "Français"}
+                      </Badge>
+                    </div>
                   </div>
                   <CardDescription className="line-clamp-2">
                     {campaign.objective}

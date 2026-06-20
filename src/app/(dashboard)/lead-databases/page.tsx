@@ -11,6 +11,7 @@ import {
   PremiumLeadDatabaseMarketplace,
   type PremiumLeadDatabase,
 } from "@/components/shared/premium-lead-database-marketplace";
+import { isSuperAdmin } from "@/lib/admin";
 
 type SampleRecord = {
   company?: string;
@@ -34,9 +35,10 @@ export default async function LeadDatabasesPage() {
       .where(eq(leadDatabasePurchases.organizationId, session.organizationId)),
   ]);
 
+  const superAdmin = isSuperAdmin(session);
   const purchasedIds = new Set(purchases.map((purchase) => purchase.databaseId));
   const unlockedDatabaseIds = databases
-    .filter((database) => purchasedIds.has(database.id))
+    .filter((database) => superAdmin || purchasedIds.has(database.id))
     .map((database) => database.id);
 
   const unlockedRecords = unlockedDatabaseIds.length
@@ -72,7 +74,7 @@ export default async function LeadDatabasesPage() {
       sampleRecords: Array.isArray(database.sampleRecords)
         ? (database.sampleRecords as SampleRecord[])
         : [],
-      isPurchased: purchasedIds.has(database.id),
+      isPurchased: superAdmin || purchasedIds.has(database.id),
       previewRecords: previewRecords.map((record) => ({
         id: record.id,
         companyName: record.companyName,

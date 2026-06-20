@@ -8,6 +8,7 @@ export const createCampaignSchema = z.object({
   scriptTemplate: z
     .string()
     .min(50, "Le script (prompt) est trop court. Fournissez plus de contexte."),
+  voiceLanguage: z.enum(["fr", "ewe"]).default("fr"),
 });
 
 export const updateCampaignSchema = createCampaignSchema.partial().extend({

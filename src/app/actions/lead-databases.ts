@@ -13,6 +13,7 @@ import {
   wallets,
 } from "@/lib/db/schema";
 import { getUserSession } from "@/lib/auth";
+import { isSuperAdmin } from "@/lib/admin";
 import { normalizePhoneNumber } from "@/lib/utils";
 
 function formatProspectNotes(record: typeof leadDatabaseRecords.$inferSelect) {
@@ -39,6 +40,11 @@ export async function purchaseLeadDatabaseAction(databaseId: string) {
     .limit(1);
 
   if (!database) return { error: "Base introuvable ou non publiée." };
+
+  if (isSuperAdmin(session)) {
+    revalidatePath("/lead-databases");
+    return { success: true, alreadyPurchased: true };
+  }
 
   const existingPurchase = await db.query.leadDatabasePurchases.findFirst({
     where: and(
@@ -118,6 +124,7 @@ export async function createCampaignFromLeadDatabaseAction(formData: FormData) {
   const databaseId = String(formData.get("databaseId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const objective = String(formData.get("objective") ?? "").trim();
+  const voiceLanguage = formData.get("voiceLanguage") === "ewe" ? "ewe" : "fr";
 
   if (!databaseId || !name || !objective) {
     return { error: "Nom de campagne, objectif et base requis." };
@@ -131,7 +138,7 @@ export async function createCampaignFromLeadDatabaseAction(formData: FormData) {
     ),
   });
 
-  if (!purchase) {
+  if (!purchase && !isSuperAdmin(session)) {
     return { error: "Vous devez acheter cette base avant de créer une campagne." };
   }
 
@@ -169,6 +176,7 @@ export async function createCampaignFromLeadDatabaseAction(formData: FormData) {
           name,
           objective,
           scriptTemplate: `Tu es l'assistant AfrivoiceAI. Objectif: ${objective}. Utilise un ton professionnel, court et respectueux. Si le prospect refuse, remercie et termine proprement. Base source: ${database.name}.`,
+          voiceLanguage,
           status: "draft",
           totalLeads: 0,
         })

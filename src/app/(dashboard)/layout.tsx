@@ -23,6 +23,7 @@ export default async function DashboardLayout({
         <Sidebar
           organizationName={session.organizationName}
           userEmail={session.email}
+          userRole={session.role}
         />
       </aside>
 

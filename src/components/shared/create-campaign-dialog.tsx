@@ -9,6 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -75,6 +82,22 @@ export function CreateCampaignDialog() {
               required
               minLength={10}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="voiceLanguage">Langue / voix de l&apos;agent *</Label>
+            <Select name="voiceLanguage" defaultValue="fr">
+              <SelectTrigger id="voiceLanguage">
+                <SelectValue placeholder="Choisir une langue" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fr">Français — voix francophone premium</SelectItem>
+                <SelectItem value="ewe">Éwé / langue locale — démo voix africaine</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Le français reste disponible. La langue locale est proposée comme option selon la campagne.
+            </p>
           </div>
 
           <div className="space-y-2">

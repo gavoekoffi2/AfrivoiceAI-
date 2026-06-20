@@ -8,6 +8,8 @@ import {
   generateEcommercePrompt,
   generateProspectingPrompt,
   getFrenchElevenLabsVoice,
+  getAgentVoice,
+  getFirstMessageForLanguage,
   getVapiWebhookServer,
 } from "@/lib/vapi/client";
 import { hasSufficientBalance } from "@/lib/utils/billing";
@@ -15,6 +17,12 @@ import { getUserSession } from "@/lib/auth";
 import { normalizePhoneNumber } from "@/lib/utils";
 import type { Vapi } from "@vapi-ai/server-sdk";
 import { buildProspectingFirstMessage } from "@/lib/prospecting";
+
+type AgentVoiceLanguage = "fr" | "ewe";
+
+function getCampaignVoiceLanguage(value: string | null | undefined): AgentVoiceLanguage {
+  return value === "ewe" ? "ewe" : "fr";
+}
 
 function getCreatedCallId(callResponse: Vapi.CallsCreateResponse): string {
   if ("id" in callResponse) {
@@ -311,12 +319,14 @@ async function initiateProspectingCall(
   }
 
   const phone = normalizePhoneNumber(lead.phone, "TG") ?? lead.phone;
+  const voiceLanguage = getCampaignVoiceLanguage(campaign.voiceLanguage);
 
   const systemPrompt = generateProspectingPrompt({
     objective: campaign.objective,
     scriptTemplate: campaign.scriptTemplate,
     leadName: lead.name ?? undefined,
     companyName: lead.company ?? undefined,
+    voiceLanguage,
   });
 
   try {
@@ -338,12 +348,18 @@ async function initiateProspectingCall(
           maxTokens: 300,
           temperature: 0.7,
         },
-        voice: getFrenchElevenLabsVoice(),
-        firstMessage: buildProspectingFirstMessage({
-          leadName: lead.name,
-          companyName: lead.company,
-        }),
-        endCallMessage: "Merci pour votre temps. Je vous souhaite une excellente journée.",
+        voice: getAgentVoice(voiceLanguage),
+        firstMessage: getFirstMessageForLanguage(
+          voiceLanguage,
+          buildProspectingFirstMessage({
+            leadName: lead.name,
+            companyName: lead.company,
+          })
+        ),
+        endCallMessage:
+          voiceLanguage === "ewe"
+            ? "Akpe na wò. Ne èdi la, míate ŋu ayi edzi le français me."
+            : "Merci pour votre temps. Je vous souhaite une excellente journée.",
         artifactPlan: { recordingEnabled: true },
         transcriber: {
           provider: "deepgram",

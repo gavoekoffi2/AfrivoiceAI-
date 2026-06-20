@@ -16,6 +16,7 @@ export async function createCampaignAction(formData: FormData) {
     name: formData.get("name") as string,
     objective: formData.get("objective") as string,
     scriptTemplate: formData.get("scriptTemplate") as string,
+    voiceLanguage: (formData.get("voiceLanguage") as string) || "fr",
   };
 
   const validated = createCampaignSchema.safeParse(rawData);
@@ -34,6 +35,7 @@ export async function createCampaignAction(formData: FormData) {
         name: validated.data.name,
         objective: validated.data.objective,
         scriptTemplate: validated.data.scriptTemplate,
+        voiceLanguage: validated.data.voiceLanguage,
         status: "draft",
       })
       .returning();

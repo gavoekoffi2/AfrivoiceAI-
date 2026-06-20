@@ -7,6 +7,13 @@ import { Loader2, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { createCampaignFromLeadDatabaseAction } from "@/app/actions/lead-databases";
 
 interface CreateCampaignFromDatabaseFormProps {
@@ -54,6 +61,15 @@ export function CreateCampaignFromDatabaseForm({
         rows={3}
         disabled={disabled || isPending}
       />
+      <Select name="voiceLanguage" defaultValue="fr" disabled={disabled || isPending}>
+        <SelectTrigger>
+          <SelectValue placeholder="Langue / voix" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="fr">Français — voix francophone premium</SelectItem>
+          <SelectItem value="ewe">Éwé / langue locale — démo voix africaine</SelectItem>
+        </SelectContent>
+      </Select>
       <Button className="w-full" disabled={disabled || isPending} type="submit">
         {isPending ? (
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />

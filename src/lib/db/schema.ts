@@ -28,7 +28,11 @@ export const users = pgTable(
       .references(() => organizations.id, { onDelete: "cascade" })
       .notNull(),
     email: text("email").notNull().unique(),
-    role: text("role").default("member").notNull(), // 'owner', 'admin', 'member'
+    role: text("role").default("member").notNull(), // 'super_admin', 'admin', 'owner', 'member'
+    subscriptionPlan: text("subscription_plan").default("free").notNull(), // 'free', 'pro', 'enterprise'
+    subscriptionExpiresAt: timestamp("subscription_expires_at"), // NULL = illimité/permanent pour un plan payant
+    isActive: boolean("is_active").default(true).notNull(),
+    adminPermissions: jsonb("admin_permissions"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
@@ -107,6 +111,7 @@ export const campaigns = pgTable(
     name: text("name").notNull(),
     objective: text("objective").notNull(),
     scriptTemplate: text("script_template").notNull(), // Prompt pour l'IA
+    voiceLanguage: text("voice_language").default("fr").notNull(), // 'fr', 'ewe'
     status: text("status").default("draft").notNull(), // 'draft', 'active', 'completed', 'paused'
     totalLeads: integer("total_leads").default(0).notNull(),
     calledLeads: integer("called_leads").default(0).notNull(),
@@ -210,6 +215,31 @@ export const leadDatabaseRecords = pgTable(
       table.companyName,
       table.phone
     ),
+  })
+);
+
+export const voiceCloneProfiles = pgTable(
+  "voice_clone_profiles",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .references(() => organizations.id, { onDelete: "cascade" })
+      .notNull(),
+    name: text("name").notNull(),
+    provider: text("provider").default("openvoice").notNull(),
+    model: text("model").default("myshell-ai/OpenVoice").notNull(),
+    status: text("status").default("draft").notNull(),
+    consentConfirmed: boolean("consent_confirmed").default(false).notNull(),
+    sampleAudioUrl: text("sample_audio_url"),
+    externalVoiceId: text("external_voice_id"),
+    notes: text("notes"),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    orgIdx: index("voice_clone_profiles_org_idx").on(table.organizationId),
+    statusIdx: index("voice_clone_profiles_status_idx").on(table.status),
   })
 );
 

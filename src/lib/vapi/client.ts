@@ -30,6 +30,34 @@ export function getFrenchVoice(): Vapi.CreateAssistantDtoVoice {
 
 export const getFrenchElevenLabsVoice = getFrenchVoice;
 
+export type AgentVoiceLanguage = "fr" | "ewe";
+
+export function getEweCustomVoice(): Vapi.CreateAssistantDtoVoice {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  if (!siteUrl) {
+    throw new Error("NEXT_PUBLIC_SITE_URL requis pour la voix Éwé custom Vapi");
+  }
+
+  return {
+    provider: "custom-voice",
+    server: {
+      url: new URL("/api/tts/ewe/vapi", siteUrl).toString(),
+      ...(process.env.AFRICAN_TTS_VAPI_SECRET
+        ? { secret: process.env.AFRICAN_TTS_VAPI_SECRET }
+        : {}),
+      timeoutSeconds: 45,
+      headers: { "Content-Type": "application/json" },
+    },
+    fallbackPlan: {
+      voices: [getFrenchVoice()],
+    },
+  } as Vapi.CreateAssistantDtoVoice;
+}
+
+export function getAgentVoice(language: AgentVoiceLanguage): Vapi.CreateAssistantDtoVoice {
+  return language === "ewe" ? getEweCustomVoice() : getFrenchVoice();
+}
+
 const FRENCH_ACCENT_RULES = `
 Règles vocales obligatoires :
 - Parle en français uniquement, avec une voix française/francophone claire, neutre et professionnelle.
@@ -38,6 +66,27 @@ Règles vocales obligatoires :
 - Utilise des phrases courtes, naturelles, avec un rythme posé de centre d'appel professionnel.
 - Évite l'argot; reste chaleureux, poli et crédible pour une entreprise francophone.
 `;
+
+const EWE_LANGUAGE_RULES = `
+Règles vocales obligatoires pour la langue locale :
+- Parle principalement en Éwé simple, naturel et court, adapté au Togo.
+- Si un mot technique ou un nom de marque est difficile à prononcer en Éwé, prononce-le lentement en français simple ou reformule.
+- Évite les longues phrases : une idée par phrase.
+- Si la personne ne comprend pas, propose immédiatement de continuer en français.
+- Ne prétends pas être un humain; si on te demande, dis simplement que tu es l'assistant vocal de l'entreprise.
+`;
+
+export function getLanguageRules(language: AgentVoiceLanguage) {
+  return language === "ewe" ? EWE_LANGUAGE_RULES : FRENCH_ACCENT_RULES;
+}
+
+export function getFirstMessageForLanguage(language: AgentVoiceLanguage, fallbackFrench: string) {
+  if (language === "ewe") {
+    return "Ŋdi na mi. Nye nye Afri Voice ƒe dɔla. Mele ka bom be mawɔ nya kpui aɖe kpli wò. Ne èdi la, mate ŋu akɔ dɔa dzi le français me.";
+  }
+
+  return fallbackFrench;
+}
 
 export function getVapiClient(): VapiClient {
   if (!vapiInstance) {
@@ -108,6 +157,7 @@ export function generateProspectingPrompt(params: {
   scriptTemplate: string;
   leadName?: string;
   companyName?: string;
+  voiceLanguage?: AgentVoiceLanguage;
 }): string {
   let script = params.scriptTemplate;
 
@@ -136,9 +186,9 @@ Cadre commercial B2B :
 - raison courte
 - prochain pas si applicable
 
-${FRENCH_ACCENT_RULES}
+${getLanguageRules(params.voiceLanguage ?? "fr")}
 Règles générales :
-- Parle uniquement en français
+- Respecte la langue/voix choisie pour cette campagne.
 - Sois professionnel, chaleureux, naturel et respectueux
 - Évite les formules trop commerciales
 - Ne mentionne pas que tu es une IA sauf si on te le demande directement

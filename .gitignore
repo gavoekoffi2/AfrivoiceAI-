@@ -38,3 +38,7 @@ next-env.d.ts
 
 # drizzle
 # Commit generated SQL migrations so deployments can initialize the database.
+
+# local Python voice demos
+/.venv-african-tts
+/artifacts/
