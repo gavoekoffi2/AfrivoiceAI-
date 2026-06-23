@@ -31,7 +31,7 @@ const workflow = [
     icon: Bot,
     label: "02 · Conversation",
     title: "L’agent appelle",
-    text: "La voix IA écoute, répond, relance et qualifie l’intention.",
+    text: "La voix IA écoute, répond et qualifie l’intention du prospect.",
   },
   {
     icon: CheckCircle2,
