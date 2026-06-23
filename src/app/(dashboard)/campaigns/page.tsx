@@ -21,8 +21,10 @@ import {
   Clock,
   Play,
   Pause,
+  PhoneCall,
 } from "lucide-react";
 import { CreateCampaignDialog } from "@/components/shared/create-campaign-dialog";
+import { QuickCallLauncher } from "@/components/shared/quick-call-launcher";
 
 const statusConfig = {
   draft: { label: "Brouillon", variant: "secondary" as const, icon: Clock },
@@ -53,10 +55,50 @@ export default async function CampaignsPage() {
             Campagnes de prospection
           </h2>
           <p className="text-muted-foreground">
-            Gérez vos campagnes d&apos;appels sortants automatisés
+            Testez quelques appels rapidement ou lancez une campagne avec une base complète.
           </p>
         </div>
         <CreateCampaignDialog />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PhoneCall className="h-5 w-5 text-primary" />
+              Lancement d’appel rapide
+            </CardTitle>
+            <CardDescription>
+              Pour tester la plateforme avec 1 à 20 numéros sans préparer une grande campagne.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <QuickCallLauncher />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Deux façons de lancer</CardTitle>
+            <CardDescription>
+              Rapide pour tester, campagne pour un volume sérieux.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <div className="rounded-lg border p-4">
+              <p className="font-medium">1. Test rapide</p>
+              <p className="mt-1 text-muted-foreground">
+                Collez quelques numéros, créez une campagne automatique et lancez directement si le wallet est prêt.
+              </p>
+            </div>
+            <div className="rounded-lg border p-4">
+              <p className="font-medium">2. Campagne complète</p>
+              <p className="mt-1 text-muted-foreground">
+                Créez une campagne, ajoutez des prospects un par un, importez un CSV ou utilisez une base prospects achetée.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {allCampaigns.length === 0 ? (

@@ -82,10 +82,35 @@ type LeadInput = {
   notes?: string;
 };
 
+const DEFAULT_QUICK_CALL_OBJECTIVE =
+  "Tester AfrivoiceAI sur quelques numéros, qualifier l'intérêt et proposer une démonstration.";
+
+const DEFAULT_QUICK_CALL_SCRIPT =
+  "Tu es l'agent vocal AfrivoiceAI. Salue poliment, explique en moins de 20 secondes que l'appel sert à présenter un assistant IA capable de gérer des appels clients, demande si la personne est intéressée par une démonstration, puis termine proprement en remerciant.";
+
 function cleanOptional(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const cleaned = value.trim();
   return cleaned ? cleaned : undefined;
+}
+
+function parseQuickCallNumbers(rawNumbers: string): LeadInput[] {
+  return rawNumbers
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [phonePart, namePart, companyPart] = line
+        .split(/[;,]/)
+        .map((part) => part.trim());
+
+      return {
+        phone: phonePart,
+        name: cleanOptional(namePart),
+        company: cleanOptional(companyPart),
+        notes: "Ajouté via lancement d'appel rapide",
+      };
+    });
 }
 
 async function addLeadsToCampaign(campaignId: string, leadsData: LeadInput[]) {
@@ -205,4 +230,102 @@ export async function importLeadsFromCsvAction(
   leadsData: Array<{ name?: string; phone: string; company?: string; email?: string }>
 ) {
   return addLeadsToCampaign(campaignId, leadsData);
+}
+
+export async function createQuickCallCampaignAction(formData: FormData) {
+  const session = await getUserSession();
+  if (!session) return { error: "Non autorisé" };
+
+  const rawNumbers = cleanOptional(formData.get("numbers"));
+  if (!rawNumbers) {
+    return { error: "Ajoutez au moins un numéro à appeler." };
+  }
+
+  const requestedLeads = parseQuickCallNumbers(rawNumbers);
+  if (requestedLeads.length === 0) {
+    return { error: "Aucun numéro valide détecté." };
+  }
+
+  if (requestedLeads.length > 20) {
+    return {
+      error:
+        "Le lancement rapide est limité à 20 numéros. Pour plus de volume, créez une campagne classique ou importez un CSV.",
+    };
+  }
+
+  const normalizedLeads = requestedLeads
+    .map((lead) => ({
+      name: cleanOptional(lead.name),
+      phone: normalizePhoneNumber(lead.phone, "TG") ?? lead.phone.trim(),
+      company: cleanOptional(lead.company),
+      email: cleanOptional(lead.email),
+      notes: cleanOptional(lead.notes),
+    }))
+    .filter((lead) => lead.phone.startsWith("+"));
+
+  if (normalizedLeads.length === 0) {
+    return {
+      error:
+        "Aucun numéro international valide. Utilisez +228..., +1..., etc. Les numéros togolais locaux sont convertis automatiquement.",
+    };
+  }
+
+  const uniqueLeads = Array.from(
+    new Map(normalizedLeads.map((lead) => [lead.phone, lead])).values()
+  );
+
+  const now = new Date();
+  const name =
+    cleanOptional(formData.get("name")) ??
+    `Test appel rapide - ${now.toLocaleDateString("fr-TG")}`;
+  const objective =
+    cleanOptional(formData.get("objective")) ?? DEFAULT_QUICK_CALL_OBJECTIVE;
+  const scriptTemplate =
+    cleanOptional(formData.get("scriptTemplate")) ?? DEFAULT_QUICK_CALL_SCRIPT;
+  const launchNow = formData.get("launchNow") === "on";
+
+  try {
+    const [campaign] = await db.transaction(async (tx) => {
+      const created = await tx
+        .insert(campaigns)
+        .values({
+          organizationId: session.organizationId,
+          name,
+          objective,
+          scriptTemplate,
+          voiceLanguage: "fr",
+          status: launchNow ? "active" : "draft",
+          totalLeads: uniqueLeads.length,
+        })
+        .returning();
+
+      await tx.insert(leads).values(
+        uniqueLeads.map((lead) => ({
+          campaignId: created[0].id,
+          organizationId: session.organizationId,
+          name: lead.name,
+          phone: lead.phone,
+          company: lead.company,
+          email: lead.email,
+          notes: lead.notes,
+          status: "new" as const,
+        }))
+      );
+
+      return created;
+    });
+
+    revalidatePath("/campaigns");
+    revalidatePath(`/campaigns/${campaign.id}`);
+
+    return {
+      success: true,
+      campaignId: campaign.id,
+      count: uniqueLeads.length,
+      launchReady: launchNow,
+    };
+  } catch (error) {
+    console.error("[campaigns/quick-call] Erreur création:", error);
+    return { error: "Erreur serveur lors de la création du test rapide." };
+  }
 }
