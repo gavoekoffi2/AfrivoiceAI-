@@ -18,6 +18,15 @@ export function getFrenchVoice(): Vapi.CreateAssistantDtoVoice {
       style: 0.2,
       useSpeakerBoost: true,
       optimizeStreamingLatency: 3,
+      fallbackPlan: {
+        voices: [
+          {
+            provider: "vapi",
+            voiceId: "Elliot",
+            language: "fr-FR",
+          },
+        ],
+      },
     };
   }
 

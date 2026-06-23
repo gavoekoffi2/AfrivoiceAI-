@@ -16,7 +16,7 @@ export function Header({ title, walletBalance, onMenuToggle }: HeaderProps) {
   const isLowBalance = walletBalance < 5000;
 
   return (
-    <header className="mx-3 mt-3 flex h-16 items-center gap-3 rounded-3xl border border-violet-200/70 bg-white/92 px-4 shadow-xl shadow-violet-100/70 backdrop-blur-2xl dark:border-white/10 dark:bg-[#101320]/92 dark:shadow-black/25 md:mx-5 md:px-6">
+    <header className="mx-3 mt-3 flex h-16 items-center gap-3 rounded-3xl border border-violet-200/45 bg-slate-100/88 px-4 shadow-lg shadow-violet-100/35 backdrop-blur-2xl dark:border-white/10 dark:bg-[#101320]/92 dark:shadow-black/25 md:mx-5 md:px-6">
       <Button
         variant="ghost"
         size="icon"
