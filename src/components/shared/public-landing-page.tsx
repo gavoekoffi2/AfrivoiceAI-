@@ -140,7 +140,7 @@ export function PublicLandingPage() {
           </Link>
           <div className="hidden items-center gap-1 rounded-full border border-white/10 bg-white/[0.035] p-1 text-sm text-white/65 backdrop-blur md:flex">
             <a href="#experience" className="rounded-full px-4 py-2 transition hover:bg-white/10 hover:text-white">Expérience</a>
-            <a href="#motion" className="rounded-full px-4 py-2 transition hover:bg-white/10 hover:text-white">Motion</a>
+            <a href="#parcours" className="rounded-full px-4 py-2 transition hover:bg-white/10 hover:text-white">Parcours</a>
             <a href="#solutions" className="rounded-full px-4 py-2 transition hover:bg-white/10 hover:text-white">Solutions</a>
             <a href="#packs" className="rounded-full px-4 py-2 transition hover:bg-white/10 hover:text-white">Prospects</a>
           </div>
@@ -167,7 +167,7 @@ export function PublicLandingPage() {
               Chaque appel devient une scène de vente intelligente.
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-white/64 md:text-xl">
-              AfrivoiceAI appelle, répond, qualifie et relance vos clients. L’expérience montre en direct comment une voix IA transforme une conversation en opportunité commerciale.
+              AfrivoiceAI appelle, répond et qualifie vos prospects. L’expérience montre simplement comment une voix IA transforme une conversation en opportunité commerciale.
             </p>
           </div>
 
@@ -310,15 +310,15 @@ export function PublicLandingPage() {
         </div>
       </section>
 
-      <section id="motion" className="relative z-10 mx-auto max-w-7xl px-4 py-14 md:px-6 lg:px-8">
+      <section id="parcours" className="relative z-10 mx-auto max-w-7xl px-4 py-14 md:px-6 lg:px-8">
         <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="relative overflow-hidden rounded-[40px] border border-white/10 bg-white/[0.035] p-6 shadow-2xl shadow-black/30 md:p-8">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_22%_18%,rgba(110,231,183,.16),transparent_28%),radial-gradient(circle_at_88%_62%,rgba(167,139,250,.18),transparent_30%)]" />
             <div className="relative">
-              <p className="text-sm uppercase tracking-[0.22em] text-emerald-100/70">expérience immersive</p>
-              <h2 className="mt-4 max-w-2xl text-4xl font-semibold tracking-[-0.06em] md:text-6xl">La page réagit au curseur, au scroll et au parcours client.</h2>
+              <p className="text-sm uppercase tracking-[0.22em] text-emerald-100/70">parcours client</p>
+              <h2 className="mt-4 max-w-2xl text-4xl font-semibold tracking-[-0.06em] md:text-6xl">Le visiteur comprend le service en quelques secondes.</h2>
               <p className="mt-5 max-w-xl leading-7 text-white/65">
-                Le visiteur ne lit pas seulement une promesse : il voit le prospect, l’appel IA, la qualification et la transmission commerciale bouger ensemble.
+                Le prospect est choisi, l’agent vocal appelle, puis l’équipe reçoit un contact qualifié avec les informations utiles.
               </p>
             </div>
             <div className="relative mt-8 h-72 overflow-hidden rounded-[32px] border border-white/10 bg-[#0a0b10]">
@@ -328,9 +328,9 @@ export function PublicLandingPage() {
 
           <div className="grid gap-4">
             {[
-              { icon: MousePointer2, title: "Cursor glow", text: "La lumière suit le mouvement et donne une sensation de contrôle premium." },
-              { icon: PhoneCall, title: "Call theater", text: "La scène montre visuellement ce qui se passe pendant un appel avec l’agent." },
-              { icon: UsersRound, title: "Sales handoff", text: "Le résultat commercial se déplace jusqu’à l’équipe avec un score lisible." },
+              { icon: MousePointer2, title: "Navigation fluide", text: "La plateforme est simple, rapide et agréable à découvrir." },
+              { icon: PhoneCall, title: "Appel IA", text: "Le prospect comprend immédiatement qu’un agent vocal peut gérer l’appel." },
+              { icon: UsersRound, title: "Contact qualifié", text: "L’équipe reçoit un résumé clair pour décider de la suite." },
             ].map((item) => (
               <div key={item.title} className="group rounded-[34px] border border-white/10 bg-[#0d0e12]/90 p-6 transition duration-300 hover:-translate-y-1 hover:border-emerald-200/30 hover:bg-[#12141b]">
                 <div className="mb-5 flex items-center justify-between">
@@ -356,7 +356,7 @@ export function PublicLandingPage() {
               <p className="text-sm uppercase tracking-[0.22em] text-emerald-100/70">solutions</p>
               <h2 className="mt-4 text-4xl font-semibold tracking-[-0.055em] md:text-5xl">Une expérience qui fait comprendre la valeur en quelques secondes.</h2>
               <p className="mt-5 leading-7 text-white/65">
-                Vos équipes suivent le parcours complet : appel IA, qualification, résumé, score commercial et prochaine action. La plateforme paraît vivante, professionnelle et prête à vendre.
+                Vos équipes suivent l’essentiel : appel IA, qualification, résumé et contact prioritaire. La plateforme paraît vivante, professionnelle et prête pour les premiers utilisateurs.
               </p>
             </div>
           </div>
