@@ -103,6 +103,10 @@ export function PremiumLeadDatabaseMarketplace({ databases }: MarketplaceProps) 
     [databases]
   );
   const purchasedCount = databases.filter((item) => item.isPurchased).length;
+  const purchasedDatabases = useMemo(
+    () => databases.filter((item) => item.isPurchased).slice(0, 6),
+    [databases]
+  );
 
   const countryStats = useMemo(
     () =>
@@ -287,6 +291,43 @@ export function PremiumLeadDatabaseMarketplace({ databases }: MarketplaceProps) 
             ))}
           </div>
         </section>
+
+        {purchasedDatabases.length > 0 && (
+          <section className="rounded-[28px] border border-emerald-300/20 bg-gradient-to-br from-emerald-400/10 via-white/[0.045] to-violet-400/10 p-5 shadow-2xl shadow-emerald-950/10">
+            <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.24em] text-emerald-200/75">Déjà payé</p>
+                <h2 className="text-2xl font-semibold tracking-[-0.04em] text-white">Vos bases prêtes à lancer</h2>
+                <p className="mt-1 text-sm text-[#a7adb8]">
+                  Après achat, la base reste ici et peut créer une campagne immédiatement.
+                </p>
+              </div>
+              <Button
+                type="button"
+                onClick={() => setSelectedCountry("all")}
+                className="rounded-2xl bg-white text-slate-950 hover:bg-white/90"
+              >
+                Voir toutes mes bases
+              </Button>
+            </div>
+            <div className="grid gap-4 xl:grid-cols-2">
+              {purchasedDatabases.map((database) => (
+                <div key={`ready-${database.id}`} className="rounded-3xl border border-white/10 bg-black/20 p-4">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-white">{database.name}</p>
+                      <p className="mt-1 text-xs text-[#8a8f98]">
+                        {countryFlag(database.country)} {countryLabel(database.country)} · {database.recordCount.toLocaleString("fr-FR")} prospects · {database.sector}
+                      </p>
+                    </div>
+                    <Badge variant="success">Prête</Badge>
+                  </div>
+                  <CreateCampaignFromDatabaseForm databaseId={database.id} databaseName={database.name} />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="space-y-8">
           {filteredDatabases.length === 0 ? (

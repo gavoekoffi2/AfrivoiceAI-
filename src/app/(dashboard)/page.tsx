@@ -87,14 +87,31 @@ export default async function DashboardOverview() {
   return (
     <div className="flex-1 space-y-6 p-4 md:p-6 lg:p-8">
       {/* En-tête */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight md:text-3xl">
-            Tableau de bord
-          </h2>
-          <p className="text-muted-foreground">
-            Bienvenue sur AfrivoiceAI — {session.organizationName}
-          </p>
+      <div className="relative overflow-hidden rounded-[32px] border border-white/50 bg-gradient-to-br from-white/90 via-violet-50/90 to-emerald-50/70 p-6 shadow-2xl shadow-violet-200/35 backdrop-blur-xl dark:border-white/10 dark:from-white/[0.08] dark:via-violet-500/10 dark:to-emerald-400/10 md:p-8">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-violet-400/25 blur-3xl" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="mb-3 inline-flex rounded-full border border-violet-300/30 bg-violet-500/10 px-3 py-1 text-xs font-medium text-violet-700 dark:text-violet-100">
+              Centre de contrôle IA
+            </p>
+            <h2 className="max-w-2xl text-3xl font-semibold tracking-[-0.06em] md:text-5xl">
+              Pilotez vos appels, campagnes et prospects depuis un espace premium.
+            </h2>
+            <p className="mt-3 max-w-xl text-muted-foreground">
+              Bienvenue sur AfrivoiceAI — {session.organizationName}. Lancez un test, achetez une base ou suivez vos résultats en temps réel.
+            </p>
+          </div>
+          <div className="grid gap-2 text-sm sm:grid-cols-3 lg:min-w-[360px]">
+            <Link href="/campaigns" className="rounded-2xl bg-slate-950 px-4 py-3 text-white transition hover:-translate-y-0.5 hover:shadow-xl dark:bg-white dark:text-slate-950">
+              Lancer appels
+            </Link>
+            <Link href="/lead-databases" className="rounded-2xl border bg-white/70 px-4 py-3 transition hover:-translate-y-0.5 hover:shadow-xl dark:border-white/10 dark:bg-white/10">
+              Bases prospects
+            </Link>
+            <Link href="/wallet" className="rounded-2xl border bg-white/70 px-4 py-3 transition hover:-translate-y-0.5 hover:shadow-xl dark:border-white/10 dark:bg-white/10">
+              Recharger
+            </Link>
+          </div>
         </div>
       </div>
 

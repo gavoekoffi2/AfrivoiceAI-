@@ -102,17 +102,18 @@ export function Sidebar({ organizationName, userEmail, userRole }: SidebarProps)
   const showAdmin = userRole === "super_admin" || userRole === "admin";
 
   return (
-    <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
+    <div className="flex h-full flex-col border-r border-white/10 bg-[#08090f]/88 text-white shadow-2xl shadow-black/30 backdrop-blur-2xl">
       {/* Header */}
-      <div className="flex items-center gap-2 p-4 pb-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary">
-          <PhoneCall className="h-4 w-4 text-sidebar-primary-foreground" />
+      <div className="flex items-center gap-3 p-4 pb-3">
+        <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 via-indigo-500 to-emerald-400 shadow-lg shadow-violet-950/30">
+          <PhoneCall className="h-5 w-5 text-white" />
+          <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-[#08090f] bg-emerald-300" />
         </div>
-        <div className="flex flex-col">
-          <span className="text-sm font-semibold text-sidebar-foreground">
+        <div className="flex min-w-0 flex-col">
+          <span className="text-base font-semibold tracking-[-0.03em] text-white">
             AfrivoiceAI
           </span>
-          <span className="text-xs text-sidebar-foreground/60 truncate max-w-[140px]">
+          <span className="truncate text-xs text-white/55 max-w-[160px]">
             {organizationName}
           </span>
         </div>
@@ -135,10 +136,10 @@ export function Sidebar({ organizationName, userEmail, userRole }: SidebarProps)
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                "group relative flex items-center gap-3 overflow-hidden rounded-2xl px-3 py-2.5 text-sm transition-all duration-300",
                 isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                  ? "bg-white text-slate-950 font-semibold shadow-lg shadow-violet-950/20"
+                  : "text-white/62 hover:bg-white/10 hover:text-white"
               )}
             >
               <item.icon className="h-4 w-4 shrink-0" />
@@ -190,7 +191,7 @@ export function Sidebar({ organizationName, userEmail, userRole }: SidebarProps)
         {comingSoonItems.map((item) => (
           <div
             key={item.title}
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/40 cursor-not-allowed"
+            className="flex items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.025] px-3 py-2.5 text-sm text-white/35 cursor-not-allowed"
           >
             <item.icon className="h-4 w-4 shrink-0" />
             <div className="flex flex-col min-w-0">
@@ -207,8 +208,8 @@ export function Sidebar({ organizationName, userEmail, userRole }: SidebarProps)
       {/* Footer - User */}
       <Separator className="bg-sidebar-border mx-2" />
       <div className="p-2">
-        <div className="flex items-center gap-3 rounded-lg px-3 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent text-xs font-semibold uppercase">
+        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.045] px-3 py-3 shadow-inner shadow-white/5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-white/20 to-white/5 text-xs font-semibold uppercase text-white">
             {userEmail.charAt(0)}
           </div>
           <div className="flex-1 min-w-0">

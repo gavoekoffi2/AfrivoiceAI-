@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getUserSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { campaigns } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { campaigns, leadDatabasePurchases, leadDatabases } from "@/lib/db/schema";
+import { eq, desc, inArray } from "drizzle-orm";
 import {
   Card,
   CardContent,
@@ -22,9 +22,12 @@ import {
   Play,
   Pause,
   PhoneCall,
+  Database,
+  Sparkles,
 } from "lucide-react";
 import { CreateCampaignDialog } from "@/components/shared/create-campaign-dialog";
 import { QuickCallLauncher } from "@/components/shared/quick-call-launcher";
+import { CreateCampaignFromDatabaseForm } from "@/components/shared/create-campaign-from-database-form";
 
 const statusConfig = {
   draft: { label: "Brouillon", variant: "secondary" as const, icon: Clock },
@@ -47,6 +50,21 @@ export default async function CampaignsPage() {
     .where(eq(campaigns.organizationId, session.organizationId))
     .orderBy(desc(campaigns.createdAt));
 
+  const purchasedDatabaseRows = await db
+    .select({ databaseId: leadDatabasePurchases.databaseId })
+    .from(leadDatabasePurchases)
+    .where(eq(leadDatabasePurchases.organizationId, session.organizationId));
+
+  const purchasedDatabaseIds = purchasedDatabaseRows.map((row) => row.databaseId);
+  const purchasedDatabases = purchasedDatabaseIds.length
+    ? await db
+        .select()
+        .from(leadDatabases)
+        .where(inArray(leadDatabases.id, purchasedDatabaseIds))
+        .orderBy(desc(leadDatabases.qualityScore))
+        .limit(4)
+    : [];
+
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
       <div className="flex items-center justify-between">
@@ -62,7 +80,7 @@ export default async function CampaignsPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-        <Card className="border-primary/20 bg-primary/5">
+        <Card className="border-primary/20 bg-primary/5 premium-card-sheen animate-soft-rise">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PhoneCall className="h-5 w-5 text-primary" />
@@ -77,7 +95,7 @@ export default async function CampaignsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="animate-soft-rise">
           <CardHeader>
             <CardTitle>Deux façons de lancer</CardTitle>
             <CardDescription>
@@ -85,13 +103,13 @@ export default async function CampaignsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
-            <div className="rounded-lg border p-4">
+            <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4">
               <p className="font-medium">1. Test rapide</p>
               <p className="mt-1 text-muted-foreground">
                 Collez quelques numéros, créez une campagne automatique et lancez directement si le wallet est prêt.
               </p>
             </div>
-            <div className="rounded-lg border p-4">
+            <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-4">
               <p className="font-medium">2. Campagne complète</p>
               <p className="mt-1 text-muted-foreground">
                 Créez une campagne, ajoutez des prospects un par un, importez un CSV ou utilisez une base prospects achetée.
@@ -100,6 +118,56 @@ export default async function CampaignsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="border-emerald-400/20 bg-gradient-to-br from-emerald-400/10 via-white/70 to-violet-400/10 dark:from-emerald-400/10 dark:via-white/[0.04] dark:to-violet-400/10">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5 text-emerald-500" />
+            Créer une campagne depuis une base achetée
+          </CardTitle>
+          <CardDescription>
+            Les bases débloquées apparaissent ici : choisissez une base, confirmez l’objectif, puis lancez les appels.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {purchasedDatabases.length === 0 ? (
+            <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-muted-foreground/25 bg-background/55 p-5 text-sm md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="font-medium">Aucune base achetée pour le moment.</p>
+                <p className="text-muted-foreground">
+                  Achetez une base prospects, puis elle viendra ici pour créer une campagne en un clic.
+                </p>
+              </div>
+              <Button asChild className="gap-2 rounded-xl">
+                <Link href="/lead-databases">
+                  <Sparkles className="h-4 w-4" />
+                  Acheter une base
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {purchasedDatabases.map((database) => (
+                <div key={database.id} className="rounded-2xl border bg-background/65 p-4 shadow-sm">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold leading-tight">{database.name}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {database.country} · {database.sector} · {database.recordCount.toLocaleString("fr-FR")} prospects
+                      </p>
+                    </div>
+                    <Badge variant="success">Débloquée</Badge>
+                  </div>
+                  <CreateCampaignFromDatabaseForm
+                    databaseId={database.id}
+                    databaseName={database.name}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {allCampaigns.length === 0 ? (
         <Card className="border-dashed">

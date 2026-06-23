@@ -32,7 +32,7 @@ export function CreateCampaignFromDatabaseForm({
 
   return (
     <form
-      className="space-y-3"
+      className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.035] p-3"
       action={(formData) => {
         startTransition(async () => {
           const result = await createCampaignFromLeadDatabaseAction(formData);

@@ -15,7 +15,7 @@ export function Header({ title, walletBalance, onMenuToggle }: HeaderProps) {
   const isLowBalance = walletBalance < 5000;
 
   return (
-    <header className="flex h-14 items-center gap-4 border-b bg-background px-4 md:px-6">
+    <header className="mx-3 mt-3 flex h-16 items-center gap-4 rounded-3xl border border-white/50 bg-white/80 px-4 shadow-xl shadow-slate-200/55 backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.055] dark:shadow-black/20 md:mx-5 md:px-6">
       <Button
         variant="ghost"
         size="icon"
@@ -25,7 +25,7 @@ export function Header({ title, walletBalance, onMenuToggle }: HeaderProps) {
         <Menu className="h-5 w-5" />
       </Button>
 
-      <h1 className="flex-1 text-lg font-semibold md:text-xl">{title}</h1>
+      <h1 className="flex-1 bg-gradient-to-r from-slate-950 via-violet-700 to-emerald-600 bg-clip-text text-lg font-semibold tracking-[-0.04em] text-transparent dark:from-white dark:via-violet-200 dark:to-emerald-200 md:text-xl">{title}</h1>
 
       <div className="flex items-center gap-3">
         {/* Solde Wallet */}

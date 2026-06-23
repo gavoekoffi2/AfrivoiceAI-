@@ -43,8 +43,8 @@ export function PurchaseLeadDatabaseButton({
           }
           toast.success(
             priceFcfa > 0
-              ? "Base achetée et ajoutée à votre espace."
-              : "Base débloquée dans votre espace."
+              ? "Base achetée. Le formulaire de création de campagne est maintenant disponible."
+              : "Base débloquée. Vous pouvez créer une campagne maintenant."
           );
           router.refresh();
         });
@@ -52,8 +52,8 @@ export function PurchaseLeadDatabaseButton({
     >
       {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
       {priceFcfa > 0
-        ? `Acheter ${priceFcfa.toLocaleString("fr-FR")} FCFA`
-        : "Débloquer gratuitement"}
+        ? `Acheter et préparer campagne · ${priceFcfa.toLocaleString("fr-FR")} FCFA`
+        : "Débloquer et préparer campagne"}
     </Button>
   );
 }
