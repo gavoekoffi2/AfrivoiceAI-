@@ -34,7 +34,7 @@ export function DashboardShell({
   }, [pathname]);
 
   return (
-    <div className="relative flex h-screen overflow-hidden bg-[#f6f7fb] text-slate-950 dark:bg-[#07080d] dark:text-white">
+    <div className="relative flex h-screen overflow-hidden bg-[#eef1fb] text-slate-950 dark:bg-[#07080d] dark:text-white">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-40 top-[-18rem] h-[34rem] w-[34rem] rounded-full bg-violet-400/20 blur-3xl animate-premium-orb" />
         <div className="absolute right-[-16rem] top-32 h-[30rem] w-[30rem] rounded-full bg-emerald-300/16 blur-3xl animate-premium-orb-delayed" />

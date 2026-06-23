@@ -102,7 +102,7 @@ export function Sidebar({ organizationName, userEmail, userRole }: SidebarProps)
   const showAdmin = userRole === "super_admin" || userRole === "admin";
 
   return (
-    <div className="flex h-full flex-col border-r border-white/10 bg-[#08090f]/88 text-white shadow-2xl shadow-black/30 backdrop-blur-2xl">
+    <div className="flex h-full flex-col border-r border-violet-300/20 bg-[linear-gradient(180deg,#080b18_0%,#11162a_46%,#07111b_100%)] text-white shadow-2xl shadow-black/40 backdrop-blur-2xl">
       {/* Header */}
       <div className="flex items-center gap-3 p-4 pb-3">
         <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 via-indigo-500 to-emerald-400 shadow-lg shadow-violet-950/30">
@@ -119,11 +119,11 @@ export function Sidebar({ organizationName, userEmail, userRole }: SidebarProps)
         </div>
       </div>
 
-      <Separator className="bg-sidebar-border mx-2 my-2" />
+      <Separator className="mx-2 my-2 bg-white/12" />
 
       {/* Navigation principale */}
       <nav className="flex-1 space-y-1 px-2 py-2">
-        <p className="px-2 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/40 mb-2">
+        <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-violet-100/70">
           Navigation
         </p>
         {mainNavItems.map((item) => {
@@ -138,8 +138,8 @@ export function Sidebar({ organizationName, userEmail, userRole }: SidebarProps)
               className={cn(
                 "group relative flex items-center gap-3 overflow-hidden rounded-2xl px-3 py-2.5 text-sm transition-all duration-300",
                 isActive
-                  ? "bg-white text-slate-950 font-semibold shadow-lg shadow-violet-950/20"
-                  : "text-white/62 hover:bg-white/10 hover:text-white"
+                  ? "bg-gradient-to-r from-white to-violet-50 text-slate-950 font-semibold shadow-lg shadow-violet-950/25"
+                  : "text-slate-100/82 hover:bg-white/12 hover:text-white"
               )}
             >
               <item.icon className="h-4 w-4 shrink-0" />
@@ -153,8 +153,8 @@ export function Sidebar({ organizationName, userEmail, userRole }: SidebarProps)
 
         {showAdmin && (
           <>
-            <Separator className="bg-sidebar-border my-3" />
-            <p className="px-2 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/40 mb-2">
+            <Separator className="my-3 bg-white/12" />
+            <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-violet-100/70">
               Administration
             </p>
             {adminNavItems.map((item) => {
@@ -165,10 +165,10 @@ export function Sidebar({ organizationName, userEmail, userRole }: SidebarProps)
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                    "group relative flex items-center gap-3 overflow-hidden rounded-2xl px-3 py-2.5 text-sm transition-all duration-300",
                     isActive
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                      ? "bg-gradient-to-r from-white to-violet-50 text-slate-950 font-semibold shadow-lg shadow-violet-950/25"
+                      : "text-slate-100/82 hover:bg-white/12 hover:text-white"
                   )}
                 >
                   <item.icon className="h-4 w-4 shrink-0" />
@@ -182,10 +182,10 @@ export function Sidebar({ organizationName, userEmail, userRole }: SidebarProps)
           </>
         )}
 
-        <Separator className="bg-sidebar-border my-3" />
+        <Separator className="my-3 bg-white/12" />
 
         {/* Coming Soon */}
-        <p className="px-2 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/40 mb-2">
+        <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-violet-100/70">
           Bientôt disponible
         </p>
         {comingSoonItems.map((item) => (
@@ -206,21 +206,21 @@ export function Sidebar({ organizationName, userEmail, userRole }: SidebarProps)
       </nav>
 
       {/* Footer - User */}
-      <Separator className="bg-sidebar-border mx-2" />
+      <Separator className="mx-2 bg-white/12" />
       <div className="p-2">
         <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.045] px-3 py-3 shadow-inner shadow-white/5">
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-white/20 to-white/5 text-xs font-semibold uppercase text-white">
             {userEmail.charAt(0)}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-sidebar-foreground truncate">
+            <p className="truncate text-xs font-medium text-white/90">
               {userEmail}
             </p>
           </div>
           <form action={logoutAction}>
             <button
               type="submit"
-              className="text-sidebar-foreground/40 hover:text-sidebar-foreground transition-colors"
+              className="text-white/50 transition-colors hover:text-white"
               title="Se déconnecter"
             >
               <LogOut className="h-4 w-4" />
