@@ -56,7 +56,7 @@ const imageScenes = [
   },
   {
     title: "Relation client premium",
-    label: "Relance, qualification et rendez-vous",
+    label: "Qualification et rendez-vous",
     src: "/landing/african-support.jpg",
   },
 ];
@@ -362,7 +362,7 @@ export function PublicLandingPage() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             {[
-              { icon: Store, title: "E-commerce", text: "Confirmer les commandes, relancer les paniers, vérifier les adresses." },
+              { icon: Store, title: "E-commerce", text: "Confirmer les commandes, vérifier les adresses, rassurer les clients." },
               { icon: MessageCircle, title: "Prospection B2B", text: "Appeler les bases prospects par pays et détecter les clients chauds." },
               { icon: PhoneCall, title: "Appels entrants", text: "Répondre quand l’équipe est occupée et capturer chaque demande." },
               { icon: ShieldCheck, title: "Suivi premium", text: "Rapports, scripts, scoring et historique pour piloter les ventes." },
