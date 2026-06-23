@@ -1,12 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { organizations, users, wallets, leadDatabasePurchases, leadDatabases } from "@/lib/db/schema";
+import { organizations, users, wallets, transactions, leadDatabasePurchases, leadDatabases } from "@/lib/db/schema";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { generateSlug } from "@/lib/utils";
-import { PLATFORM_ADMIN_PERMISSIONS, requirePlatformAdmin, SUPER_ADMIN_EMAIL } from "@/lib/admin";
+import { isSuperAdmin, PLATFORM_ADMIN_PERMISSIONS, requirePlatformAdmin, SUPER_ADMIN_EMAIL } from "@/lib/admin";
 
 type AdminActionResult = { success?: string; error?: string };
 
@@ -159,6 +159,65 @@ export async function updateAdminPermissionsAction(formData: FormData): Promise<
     .where(eq(users.id, userId));
   revalidatePath("/admin");
   return { success: "Permissions sous-admin mises à jour." };
+}
+
+export async function manualWalletRechargeAction(formData: FormData): Promise<AdminActionResult> {
+  const session = await requirePlatformAdmin("users:manage");
+  if (!isSuperAdmin(session)) {
+    return { error: "Seul le super administrateur peut créditer manuellement un wallet." };
+  }
+
+  const email = value(formData, "email").toLowerCase();
+  const amount = Number(value(formData, "amountFcfa"));
+  const reason = value(formData, "reason") || "Recharge manuelle super administrateur";
+
+  if (!email.includes("@")) return { error: "Email invalide." };
+  if (!Number.isFinite(amount) || amount <= 0) return { error: "Montant invalide." };
+  if (amount > 100000000) return { error: "Montant trop élevé pour une opération manuelle." };
+
+  try {
+    const targetUser = await db.query.users.findFirst({ where: eq(users.email, email) });
+    if (!targetUser) return { error: `Compte introuvable pour ${email}.` };
+
+    const [wallet] = await db
+      .select()
+      .from(wallets)
+      .where(eq(wallets.organizationId, targetUser.organizationId))
+      .limit(1);
+
+    if (!wallet) return { error: "Wallet introuvable pour ce compte." };
+
+    await db.transaction(async (tx) => {
+      await tx.insert(transactions).values({
+        walletId: wallet.id,
+        type: "admin_manual_credit",
+        amountFcfa: amount.toString(),
+        description: reason,
+        metadata: {
+          operation: "super_admin_manual_recharge",
+          targetEmail: email,
+          targetUserId: targetUser.id,
+          requestedBy: session.id,
+          requestedByEmail: session.email,
+        },
+      });
+
+      await tx
+        .update(wallets)
+        .set({
+          balanceFcfa: sql`${wallets.balanceFcfa} + ${amount}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(wallets.id, wallet.id));
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/wallet");
+    return { success: `${amount.toLocaleString("fr-FR")} FCFA ajoutés au wallet de ${email}.` };
+  } catch (error) {
+    console.error("[admin] manualWalletRechargeAction", error);
+    return { error: error instanceof Error ? error.message : "Erreur serveur." };
+  }
 }
 
 export async function unlockDatabaseForUserAction(formData: FormData): Promise<AdminActionResult> {

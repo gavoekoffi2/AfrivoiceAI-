@@ -46,9 +46,9 @@ export default async function DashboardOverview() {
       bgColor: "bg-blue-50 dark:bg-blue-950",
     },
     {
-      title: "Commandes Confirmées",
-      value: stats.confirmedOrders.toLocaleString("fr-TG"),
-      description: `Taux de succès : ${stats.confirmationRate}%`,
+      title: "Espace Entreprises",
+      value: "Actif",
+      description: "Prospection téléphonique B2B",
       icon: CheckCircle,
       color: "text-green-500",
       bgColor: "bg-green-50 dark:bg-green-950",
@@ -192,7 +192,7 @@ export default async function DashboardOverview() {
                     <div className="min-w-0">
                       <p className="text-xs font-medium truncate">
                         {call.type === "ecommerce_confirmation"
-                          ? "Confirmation"
+                          ? "Appel automatisé"
                           : "Prospection"}
                       </p>
                       <p className="text-xs text-muted-foreground">

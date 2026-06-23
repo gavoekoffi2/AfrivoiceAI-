@@ -5,12 +5,23 @@ import { wallets, transactions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { depositSchema } from "@/lib/validations/wallet";
 import { sql } from "drizzle-orm";
+import { isSuperAdmin } from "@/lib/admin";
 
 export async function POST(req: Request) {
   try {
     const session = await getUserSession();
     if (!session) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    if (!isSuperAdmin(session)) {
+      return NextResponse.json(
+        {
+          error:
+            "Recharge manuelle réservée au super administrateur. Les paiements Mobile Money seront activés séparément.",
+        },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();

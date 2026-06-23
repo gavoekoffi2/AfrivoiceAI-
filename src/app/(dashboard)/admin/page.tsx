@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { requirePlatformAdmin, PLATFORM_ADMIN_PERMISSIONS, SUPER_ADMIN_EMAIL } from "@/lib/admin";
 import { db } from "@/lib/db";
 import { campaigns, calls, leadDatabasePurchases, leadDatabaseRecords, leadDatabases, organizations, users, wallets } from "@/lib/db/schema";
-import { ensureFounderSuperAdminAction, grantSubscriptionAction, unlockDatabaseForUserAction, updateAdminPermissionsAction, updateUserStatusAction } from "@/app/actions/admin";
+import { ensureFounderSuperAdminAction, grantSubscriptionAction, manualWalletRechargeAction, unlockDatabaseForUserAction, updateAdminPermissionsAction, updateUserStatusAction } from "@/app/actions/admin";
 
 function fmt(value: number) {
   return value.toLocaleString("fr-FR");
@@ -44,6 +44,11 @@ async function updateAdminPermissionsFormAction(formData: FormData) {
 async function updateUserStatusFormAction(formData: FormData) {
   "use server";
   await updateUserStatusAction(formData);
+}
+
+async function manualWalletRechargeFormAction(formData: FormData) {
+  "use server";
+  await manualWalletRechargeAction(formData);
 }
 
 export default async function AdminPage() {
@@ -150,6 +155,22 @@ export default async function AdminPage() {
 
           <Card className="border-white/10 bg-[#101114] text-white">
             <CardHeader>
+              <CardTitle>Recharge manuelle wallet</CardTitle>
+              <CardDescription>Crédite n’importe quel compte sans paiement Mobile Money/Stripe. Réservé au super administrateur.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form action={manualWalletRechargeFormAction} className="grid gap-4 md:grid-cols-2">
+                <Field label="Email du compte à créditer"><Input name="email" type="email" placeholder="client@email.com" defaultValue={SUPER_ADMIN_EMAIL} required /></Field>
+                <Field label="Montant FCFA"><Input name="amountFcfa" type="number" min="1" step="1" placeholder="1000000" required /></Field>
+                <Field label="Raison interne"><Input name="reason" placeholder="Crédit manuel / geste commercial / test" defaultValue="Recharge manuelle super administrateur" /></Field>
+                <Button className="self-end bg-yellow-400 text-black hover:bg-yellow-300">Créditer le wallet sans paiement</Button>
+              </form>
+              <p className="mt-3 text-xs text-white/45">Une transaction interne est enregistrée pour garder l’historique de recharge.</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/10 bg-[#101114] text-white">
+            <CardHeader>
               <CardTitle>Débloquer une base de données</CardTitle>
               <CardDescription>Débloque une base ou tout le catalogue pour une organisation via email.</CardDescription>
             </CardHeader>
@@ -228,6 +249,7 @@ export default async function AdminPage() {
                 "Créer des comptes clients et sous-admins",
                 "Offrir Pro/Enterprise avec durée ou illimité",
                 "Bloquer ou réactiver un compte",
+                "Recharger manuellement n’importe quel wallet sans paiement",
                 "Débloquer une ou toutes les bases de données",
                 "Limiter les sous-admins par permissions",
                 "Voir statistiques plateforme, achats, campagnes et appels",

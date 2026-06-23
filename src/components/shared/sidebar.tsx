@@ -29,11 +29,6 @@ const mainNavItems = [
     exact: true,
   },
   {
-    title: "Commandes E-commerce",
-    href: "/e-commerce",
-    icon: ShoppingCart,
-  },
-  {
     title: "Campagnes",
     href: "/campaigns",
     icon: Megaphone,
@@ -121,10 +116,45 @@ export function Sidebar({ organizationName, userEmail, userRole }: SidebarProps)
 
       <Separator className="mx-2 my-2 bg-white/12" />
 
+      <div className="px-2 py-2">
+        <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-violet-100/70">
+          Espace plateforme
+        </p>
+        <div className="space-y-2 rounded-3xl border border-white/10 bg-white/[0.035] p-2">
+          <Link
+            href="/"
+            className={cn(
+              "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition-all",
+              pathname !== "/e-commerce"
+                ? "bg-gradient-to-r from-emerald-300 to-violet-100 text-slate-950 font-semibold"
+                : "text-white/75 hover:bg-white/10 hover:text-white"
+            )}
+          >
+            <Megaphone className="h-4 w-4" />
+            <span>Entreprises / prospection</span>
+          </Link>
+          <Link
+            href="/e-commerce"
+            className={cn(
+              "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition-all",
+              pathname.startsWith("/e-commerce")
+                ? "bg-gradient-to-r from-white to-violet-50 text-slate-950 font-semibold"
+                : "text-white/60 hover:bg-white/10 hover:text-white"
+            )}
+          >
+            <ShoppingCart className="h-4 w-4" />
+            <span className="min-w-0 flex-1 truncate">E-commerce COD</span>
+            <Badge variant="comingSoon" className="shrink-0 text-[10px]">
+              Bientôt
+            </Badge>
+          </Link>
+        </div>
+      </div>
+
       {/* Navigation principale */}
       <nav className="flex-1 space-y-1 px-2 py-2">
         <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-violet-100/70">
-          Navigation
+          Prospection entreprises
         </p>
         {mainNavItems.map((item) => {
           const isActive = item.exact

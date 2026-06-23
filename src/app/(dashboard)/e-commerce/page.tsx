@@ -92,14 +92,22 @@ export default async function EcommercePage() {
 
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">
-          Commandes E-commerce
+      <div className="relative overflow-hidden rounded-[32px] border border-orange-200/60 bg-gradient-to-br from-orange-50 via-white to-violet-50 p-6 shadow-xl shadow-orange-100/60 dark:border-orange-300/15 dark:from-orange-500/10 dark:via-white/[0.04] dark:to-violet-500/10 md:p-8">
+        <Badge variant="warning" className="mb-4">Module indépendant · préparation</Badge>
+        <h2 className="text-3xl font-semibold tracking-[-0.05em] md:text-5xl">
+          Espace E-commerce COD
         </h2>
-        <p className="text-muted-foreground">
-          Confirmation automatique des commandes paiement à la livraison (COD)
-          via Shopify et WooCommerce
+        <p className="mt-3 max-w-2xl text-muted-foreground">
+          Ce module sera séparé de l’espace Entreprises / Prospection. Il servira aux e-commerçants pour confirmer automatiquement les commandes Shopify/WooCommerce, sans mélanger leurs données avec les campagnes B2B.
         </p>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <Button asChild>
+            <Link href="/">Retour espace Entreprises</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/settings">Préparer les intégrations</Link>
+          </Button>
+        </div>
       </div>
 
       {/* Statistiques */}
