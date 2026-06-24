@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getUserSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { campaigns, leadDatabasePurchases, leadDatabases, leadDatabaseRecords } from "@/lib/db/schema";
-import { eq, desc, inArray, sql } from "drizzle-orm";
+import { campaigns, leadDatabasePurchases, leadDatabases } from "@/lib/db/schema";
+import { eq, desc, inArray } from "drizzle-orm";
 import {
   Card,
   CardContent,
@@ -65,27 +65,6 @@ export default async function CampaignsPage() {
         .limit(4)
     : [];
 
-  const [canadaTestLead] = await db
-    .select({
-      phone: leadDatabaseRecords.phone,
-      name: leadDatabaseRecords.contactName,
-      company: leadDatabaseRecords.companyName,
-    })
-    .from(leadDatabaseRecords)
-    .where(
-      sql`${leadDatabaseRecords.phone} is not null and (${leadDatabaseRecords.country} = 'CA' or ${leadDatabaseRecords.phone} like '+1%')`
-    )
-    .orderBy(desc(leadDatabaseRecords.opportunityScore))
-    .limit(1);
-
-  const canadaQuickCallLead = canadaTestLead?.phone
-    ? {
-        phone: canadaTestLead.phone,
-        name: canadaTestLead.name,
-        company: canadaTestLead.company,
-      }
-    : null;
-
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
       <div className="flex items-center justify-between">
@@ -112,7 +91,7 @@ export default async function CampaignsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <QuickCallLauncher canadaTestLead={canadaQuickCallLead} />
+            <QuickCallLauncher />
           </CardContent>
         </Card>
 

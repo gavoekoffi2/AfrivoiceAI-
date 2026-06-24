@@ -4,7 +4,10 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, PhoneCall, Rocket, Sparkles } from "lucide-react";
-import { createQuickCallCampaignAction } from "@/app/actions/campaigns";
+import {
+  createQuickCallCampaignAction,
+  getCanadaQuickCallTestLeadAction,
+} from "@/app/actions/campaigns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,10 +17,6 @@ type QuickCallTestLead = {
   phone: string;
   name?: string | null;
   company?: string | null;
-};
-
-type QuickCallLauncherProps = {
-  canadaTestLead?: QuickCallTestLead | null;
 };
 
 const DEFAULT_TEST_OBJECTIVE =
@@ -34,27 +33,19 @@ function todayLabel() {
   }).format(new Date());
 }
 
-function fallbackCanadaLead(): Required<QuickCallTestLead> {
-  return {
-    phone: "+14165550190",
-    name: "Prospect Canada test",
-    company: "Entreprise canadienne exemple",
-  };
-}
-
-export function QuickCallLauncher({ canadaTestLead }: QuickCallLauncherProps) {
+export function QuickCallLauncher() {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
   const [isLaunching, setIsLaunching] = useState(false);
+  const [isFillingTest, setIsFillingTest] = useState(false);
   const [name, setName] = useState("");
   const [objective, setObjective] = useState("");
   const [numbers, setNumbers] = useState("");
   const [scriptTemplate, setScriptTemplate] = useState("");
   const [launchNow, setLaunchNow] = useState(true);
 
-  function fillCanadaTestData() {
-    const lead = canadaTestLead?.phone ? canadaTestLead : fallbackCanadaLead();
+  function applyCanadaTestLead(lead: QuickCallTestLead) {
     const leadName = lead.name?.trim() || "Prospect Canada test";
     const company = lead.company?.trim() || "Entreprise canadienne";
 
@@ -63,11 +54,34 @@ export function QuickCallLauncher({ canadaTestLead }: QuickCallLauncherProps) {
     setNumbers(`${lead.phone}, ${leadName}, ${company}`);
     setScriptTemplate(DEFAULT_TEST_SCRIPT);
     setLaunchNow(true);
-    toast.success(
-      canadaTestLead?.phone
-        ? "Données de test remplies avec un vrai prospect Canada de la base."
-        : "Données de test remplies. Aucun prospect Canada trouvé en base, numéro Canada de démonstration utilisé."
-    );
+  }
+
+  async function fillCanadaTestData() {
+    setIsFillingTest(true);
+    try {
+      const result = await getCanadaQuickCallTestLeadAction();
+      if (result.lead?.phone) {
+        applyCanadaTestLead(result.lead);
+        toast.success("Données de test remplies avec un vrai numéro Canada de la base.");
+        return;
+      }
+
+      setName(`Test Canada automatique - ${todayLabel()}`);
+      setObjective(DEFAULT_TEST_OBJECTIVE);
+      setNumbers("");
+      setScriptTemplate(DEFAULT_TEST_SCRIPT);
+      setLaunchNow(false);
+      toast.error(result.error ?? "Aucun numéro Canada disponible pour pré-remplir le test.");
+    } catch {
+      setName(`Test Canada automatique - ${todayLabel()}`);
+      setObjective(DEFAULT_TEST_OBJECTIVE);
+      setNumbers("");
+      setScriptTemplate(DEFAULT_TEST_SCRIPT);
+      setLaunchNow(false);
+      toast.error("La page reste utilisable, mais la récupération du numéro Canada a échoué.");
+    } finally {
+      setIsFillingTest(false);
+    }
   }
 
   function handleSubmit(formData: FormData) {
@@ -124,7 +138,7 @@ export function QuickCallLauncher({ canadaTestLead }: QuickCallLauncherProps) {
     });
   }
 
-  const busy = isPending || isLaunching;
+  const busy = isPending || isLaunching || isFillingTest;
 
   return (
     <form ref={formRef} action={handleSubmit} className="space-y-4">
@@ -143,7 +157,7 @@ export function QuickCallLauncher({ canadaTestLead }: QuickCallLauncherProps) {
             onClick={fillCanadaTestData}
             disabled={busy}
           >
-            <Sparkles className="h-4 w-4" />
+            {isFillingTest ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             Remplir un test Canada
           </Button>
         </div>
