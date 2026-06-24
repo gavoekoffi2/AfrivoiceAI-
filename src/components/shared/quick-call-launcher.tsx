@@ -3,21 +3,75 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, PhoneCall, Rocket } from "lucide-react";
+import { Loader2, PhoneCall, Rocket, Sparkles } from "lucide-react";
 import { createQuickCallCampaignAction } from "@/app/actions/campaigns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-export function QuickCallLauncher() {
+type QuickCallTestLead = {
+  phone: string;
+  name?: string | null;
+  company?: string | null;
+};
+
+type QuickCallLauncherProps = {
+  canadaTestLead?: QuickCallTestLead | null;
+};
+
+const DEFAULT_TEST_OBJECTIVE =
+  "Tester AfrivoiceAI avec un prospect canadien réel de la base et vérifier que l'agent peut présenter la solution clairement.";
+
+const DEFAULT_TEST_SCRIPT =
+  "Tu es l'agent vocal AfrivoiceAI. Appelle en français, salue poliment, précise que c'est un court appel de test pour présenter un assistant IA capable de gérer les appels clients. Vérifie si la personne peut écouter 30 secondes, explique la valeur pour automatiser les appels entrants/sortants, demande si elle souhaite une démo plus tard, puis remercie et termine proprement.";
+
+function todayLabel() {
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date());
+}
+
+function fallbackCanadaLead(): Required<QuickCallTestLead> {
+  return {
+    phone: "+14165550190",
+    name: "Prospect Canada test",
+    company: "Entreprise canadienne exemple",
+  };
+}
+
+export function QuickCallLauncher({ canadaTestLead }: QuickCallLauncherProps) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
   const [isLaunching, setIsLaunching] = useState(false);
+  const [name, setName] = useState("");
+  const [objective, setObjective] = useState("");
+  const [numbers, setNumbers] = useState("");
+  const [scriptTemplate, setScriptTemplate] = useState("");
+  const [launchNow, setLaunchNow] = useState(true);
+
+  function fillCanadaTestData() {
+    const lead = canadaTestLead?.phone ? canadaTestLead : fallbackCanadaLead();
+    const leadName = lead.name?.trim() || "Prospect Canada test";
+    const company = lead.company?.trim() || "Entreprise canadienne";
+
+    setName(`Test Canada automatique - ${todayLabel()}`);
+    setObjective(DEFAULT_TEST_OBJECTIVE);
+    setNumbers(`${lead.phone}, ${leadName}, ${company}`);
+    setScriptTemplate(DEFAULT_TEST_SCRIPT);
+    setLaunchNow(true);
+    toast.success(
+      canadaTestLead?.phone
+        ? "Données de test remplies avec un vrai prospect Canada de la base."
+        : "Données de test remplies. Aucun prospect Canada trouvé en base, numéro Canada de démonstration utilisé."
+    );
+  }
 
   function handleSubmit(formData: FormData) {
-    const launchNow = formData.get("launchNow") === "on";
+    const shouldLaunchNow = formData.get("launchNow") === "on";
 
     startTransition(async () => {
       const result = await createQuickCallCampaignAction(formData);
@@ -34,8 +88,13 @@ export function QuickCallLauncher() {
 
       toast.success(`${result.count} numéro(s) ajouté(s) à une campagne rapide.`);
       formRef.current?.reset();
+      setName("");
+      setObjective("");
+      setNumbers("");
+      setScriptTemplate("");
+      setLaunchNow(true);
 
-      if (!launchNow) {
+      if (!shouldLaunchNow) {
         router.push(`/campaigns/${result.campaignId}`);
         return;
       }
@@ -69,6 +128,27 @@ export function QuickCallLauncher() {
 
   return (
     <form ref={formRef} action={handleSubmit} className="space-y-4">
+      <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="font-semibold text-foreground">Test prêt en 1 clic</p>
+            <p className="text-sm text-muted-foreground">
+              Remplit automatiquement la campagne, le script et un numéro canadien issu de la base si disponible.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            className="gap-2 rounded-xl bg-background/90"
+            onClick={fillCanadaTestData}
+            disabled={busy}
+          >
+            <Sparkles className="h-4 w-4" />
+            Remplir un test Canada
+          </Button>
+        </div>
+      </div>
+
       <div className="grid gap-3 md:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="quick-campaign-name">Nom du test</Label>
@@ -77,6 +157,8 @@ export function QuickCallLauncher() {
             name="name"
             placeholder="Ex: Test appel rapide"
             disabled={busy}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
           />
         </div>
         <div className="space-y-2">
@@ -86,6 +168,8 @@ export function QuickCallLauncher() {
             name="objective"
             placeholder="Qualifier l’intérêt et proposer une démo"
             disabled={busy}
+            value={objective}
+            onChange={(event) => setObjective(event.target.value)}
           />
         </div>
       </div>
@@ -97,8 +181,10 @@ export function QuickCallLauncher() {
           name="numbers"
           required
           rows={5}
-          placeholder={`Un numéro par ligne. Ex:\n+22890000000\n+15145550000, Koffi Mensah, Boutique Afi`}
+          placeholder={`Un numéro par ligne. Ex:\n+228****0000\n+151****0000, Koffi Mensah, Boutique Afi`}
           disabled={busy}
+          value={numbers}
+          onChange={(event) => setNumbers(event.target.value)}
         />
         <p className="text-xs text-muted-foreground">
           Pour tester vite : collez 1 à 20 numéros. Format accepté : numéro seul, ou numéro, nom, entreprise.
@@ -113,6 +199,8 @@ export function QuickCallLauncher() {
           rows={4}
           placeholder="L’agent doit saluer, expliquer brièvement AfrivoiceAI, vérifier si la personne est intéressée et résumer la réponse."
           disabled={busy}
+          value={scriptTemplate}
+          onChange={(event) => setScriptTemplate(event.target.value)}
         />
       </div>
 
@@ -121,7 +209,8 @@ export function QuickCallLauncher() {
           type="checkbox"
           name="launchNow"
           className="mt-1"
-          defaultChecked
+          checked={launchNow}
+          onChange={(event) => setLaunchNow(event.target.checked)}
           disabled={busy}
         />
         <span>
