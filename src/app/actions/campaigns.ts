@@ -2,63 +2,11 @@
 
 import { createCampaignSchema } from "@/lib/validations/campaign";
 import { db } from "@/lib/db";
-import { campaigns, leads, leadDatabaseRecords } from "@/lib/db/schema";
+import { campaigns, leads } from "@/lib/db/schema";
 import { getUserSession } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { normalizePhoneNumber } from "@/lib/utils";
-
-type CanadaTestLeadResult = {
-  phone: string;
-  name: string | null;
-  company: string | null;
-};
-
-export async function getCanadaQuickCallTestLeadAction(): Promise<{
-  lead?: CanadaTestLeadResult;
-  error?: string;
-}> {
-  const session = await getUserSession();
-  if (!session) return { error: "Non autorisé" };
-
-  try {
-    const [countryLead] = await db
-      .select({
-        phone: leadDatabaseRecords.phone,
-        name: leadDatabaseRecords.contactName,
-        company: leadDatabaseRecords.companyName,
-      })
-      .from(leadDatabaseRecords)
-      .where(sql`${leadDatabaseRecords.phone} is not null and ${leadDatabaseRecords.country} = 'CA'`)
-      .limit(1);
-
-    const [phoneLead] = countryLead?.phone
-      ? [countryLead]
-      : await db
-          .select({
-            phone: leadDatabaseRecords.phone,
-            name: leadDatabaseRecords.contactName,
-            company: leadDatabaseRecords.companyName,
-          })
-          .from(leadDatabaseRecords)
-          .where(sql`${leadDatabaseRecords.phone} is not null and ${leadDatabaseRecords.phone} like '+1%'`)
-          .limit(1);
-
-    const lead = countryLead?.phone ? countryLead : phoneLead;
-    if (!lead?.phone) return { error: "Aucun numéro Canada trouvé dans la base." };
-
-    return {
-      lead: {
-        phone: lead.phone,
-        name: lead.name,
-        company: lead.company,
-      },
-    };
-  } catch (error) {
-    console.error("[campaigns] Erreur récupération test Canada:", error);
-    return { error: "Impossible de récupérer un numéro Canada depuis la base." };
-  }
-}
 
 export async function createCampaignAction(formData: FormData) {
   const session = await getUserSession();

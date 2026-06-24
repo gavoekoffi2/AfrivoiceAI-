@@ -4,10 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, PhoneCall, Rocket, Sparkles } from "lucide-react";
-import {
-  createQuickCallCampaignAction,
-  getCanadaQuickCallTestLeadAction,
-} from "@/app/actions/campaigns";
+import { createQuickCallCampaignAction } from "@/app/actions/campaigns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,9 +55,21 @@ export function QuickCallLauncher() {
 
   async function fillCanadaTestData() {
     setIsFillingTest(true);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 8000);
+
     try {
-      const result = await getCanadaQuickCallTestLeadAction();
-      if (result.lead?.phone) {
+      const response = await fetch("/api/campaigns/test-canada-lead", {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        lead?: QuickCallTestLead;
+        error?: string;
+      };
+
+      if (response.ok && result.lead?.phone) {
         applyCanadaTestLead(result.lead);
         toast.success("Données de test remplies avec un vrai numéro Canada de la base.");
         return;
@@ -72,14 +81,19 @@ export function QuickCallLauncher() {
       setScriptTemplate(DEFAULT_TEST_SCRIPT);
       setLaunchNow(false);
       toast.error(result.error ?? "Aucun numéro Canada disponible pour pré-remplir le test.");
-    } catch {
+    } catch (error) {
       setName(`Test Canada automatique - ${todayLabel()}`);
       setObjective(DEFAULT_TEST_OBJECTIVE);
       setNumbers("");
       setScriptTemplate(DEFAULT_TEST_SCRIPT);
       setLaunchNow(false);
-      toast.error("La page reste utilisable, mais la récupération du numéro Canada a échoué.");
+      toast.error(
+        error instanceof DOMException && error.name === "AbortError"
+          ? "La récupération du numéro Canada a pris trop de temps. La page reste utilisable."
+          : "La page reste utilisable, mais la récupération du numéro Canada a échoué."
+      );
     } finally {
+      window.clearTimeout(timeout);
       setIsFillingTest(false);
     }
   }
