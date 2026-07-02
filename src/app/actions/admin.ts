@@ -266,7 +266,7 @@ export async function ensureFounderSuperAdminAction(formData: FormData): Promise
       email,
       password,
       role: "super_admin",
-      organizationName: "Super Administration AfrivoiceAI",
+      organizationName: "Super Administration AfrivoxAI",
     });
     await db
       .update(users)

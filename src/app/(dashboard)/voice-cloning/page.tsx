@@ -15,7 +15,7 @@ const engines = [
     name: "OpenVoice V2",
     repo: "myshell-ai/OpenVoice",
     license: "MIT",
-    fit: "Choix principal AfrivoiceAI : licence commerciale claire, français, intégration API simple.",
+    fit: "Choix principal AfrivoxAI : licence commerciale claire, français, intégration API simple.",
     status: "Sélectionné",
   },
   {

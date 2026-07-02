@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "AfrivoiceAI — Connexion",
-  description: "Connectez-vous à votre espace AfrivoiceAI",
+  title: "AfrivoxAI — Connexion",
+  description: "Connectez-vous à votre espace AfrivoxAI",
 };
 
 export default function AuthLayout({

@@ -13,7 +13,7 @@ export default function AfricanVoicesPage() {
           </div>
           <h1 className="text-3xl font-bold tracking-tight">Voix africaines</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Prototype pour prouver qu’AfrivoiceAI peut générer des voix en langues locales comme l’Éwé. Cette page sert à écouter, comparer et préparer une démonstration avant intégration téléphonique complète.
+            Prototype pour prouver qu’AfrivoxAI peut générer des voix en langues locales comme l’Éwé. Cette page sert à écouter, comparer et préparer une démonstration avant intégration téléphonique complète.
           </p>
         </div>
       </div>

@@ -103,7 +103,7 @@ export default async function AdminPage() {
                 Console fondateur · {roleLabel(session.role)}
               </Badge>
               <h1 className="text-4xl font-semibold tracking-[-0.05em] md:text-6xl">
-                Super administration AfrivoiceAI
+                Super administration AfrivoxAI
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-white/60 md:text-base">
                 Gère les abonnements, les sous-administrateurs, les droits, les bases de données, les déblocages clients et la vue globale de la plateforme.

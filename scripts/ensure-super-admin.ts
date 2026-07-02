@@ -34,13 +34,13 @@ async function main() {
     email: normalizedEmail,
     password,
     email_confirm: true,
-    user_metadata: { organization_name: "Super Administration AfrivoiceAI" },
+    user_metadata: { organization_name: "Super Administration AfrivoxAI" },
   });
   if (error || !data.user) throw new Error(error?.message || "Création Supabase impossible.");
 
   try {
     await db.transaction(async (tx) => {
-      const orgName = "Super Administration AfrivoiceAI";
+      const orgName = "Super Administration AfrivoxAI";
       const [organization] = await tx.insert(organizations).values({
         name: orgName,
         slug: `${generateSlug(orgName)}-${data.user!.id.slice(0, 8)}`,

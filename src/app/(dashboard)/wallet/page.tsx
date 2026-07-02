@@ -28,7 +28,7 @@ export default async function WalletPage() {
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Wallet</h2>
         <p className="text-muted-foreground">
-          Gérez vos crédits AfrivoiceAI en FCFA
+          Gérez vos crédits AfrivoxAI en FCFA
         </p>
       </div>
 

@@ -134,7 +134,7 @@ export function PublicLandingPage() {
               <PhoneCall className="relative h-5 w-5 text-white" />
             </span>
             <div>
-              <p className="text-sm font-semibold tracking-[-0.02em]">AfrivoiceAI</p>
+              <p className="text-sm font-semibold tracking-[-0.02em]">AfrivoxAI</p>
               <p className="text-[11px] text-white/45">Voice AI pour l’Afrique</p>
             </div>
           </Link>
@@ -167,7 +167,7 @@ export function PublicLandingPage() {
               Chaque appel devient une scène de vente intelligente.
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-white/64 md:text-xl">
-              AfrivoiceAI appelle, répond et qualifie vos prospects. L’expérience montre simplement comment une voix IA transforme une conversation en opportunité commerciale.
+              AfrivoxAI appelle, répond et qualifie vos prospects. L’expérience montre simplement comment une voix IA transforme une conversation en opportunité commerciale.
             </p>
           </div>
 
@@ -408,7 +408,7 @@ export function PublicLandingPage() {
           <span className="grid h-9 w-9 place-items-center rounded-2xl border border-white/10 bg-white/[0.05]">
             <Building2 className="h-4 w-4 text-white/65" />
           </span>
-          <span>© {new Date().getFullYear()} AfrivoiceAI. Tous droits réservés.</span>
+          <span>© {new Date().getFullYear()} AfrivoxAI. Tous droits réservés.</span>
         </div>
         <div className="flex gap-4">
           <Link href="/login" className="transition hover:text-white">Connexion</Link>

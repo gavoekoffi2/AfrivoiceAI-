@@ -1,7 +1,7 @@
 # OpenVoice adapter service — contrat minimal
 
 Ce dossier documente le microservice à déployer sur un serveur GPU/CPU séparé.
-AfrivoiceAI appelle ce service via `OPENVOICE_API_URL`.
+AfrivoxAI appelle ce service via `OPENVOICE_API_URL`.
 
 ## Endpoints nécessaires
 
@@ -47,5 +47,5 @@ STORAGE_BUCKET=...
 1. Déployer OpenVoice V2 officiel sur VPS/GPU.
 2. Ajouter un petit wrapper FastAPI avec `/health` et `/clone`.
 3. Stocker les previews générées dans Supabase Storage/S3.
-4. Appeler le callback AfrivoiceAI avec `OPENVOICE_CALLBACK_SECRET`.
-5. Configurer dans AfrivoiceAI : `OPENVOICE_API_URL`, `OPENVOICE_API_KEY`, `OPENVOICE_CALLBACK_SECRET`.
+4. Appeler le callback AfrivoxAI avec `OPENVOICE_CALLBACK_SECRET`.
+5. Configurer dans AfrivoxAI : `OPENVOICE_API_URL`, `OPENVOICE_API_KEY`, `OPENVOICE_CALLBACK_SECRET`.

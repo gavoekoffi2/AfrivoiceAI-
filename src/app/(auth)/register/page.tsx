@@ -41,7 +41,7 @@ export default function RegisterPage() {
           <div className="flex items-center justify-center rounded-full bg-primary/10 p-3">
             <PhoneCall className="h-8 w-8 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold text-white">AfrivoiceAI</h1>
+          <h1 className="text-3xl font-bold text-white">AfrivoxAI</h1>
           <p className="text-slate-400">Commencez à automatiser vos appels dès aujourd&apos;hui</p>
         </div>
 
@@ -49,7 +49,7 @@ export default function RegisterPage() {
           <CardHeader>
             <CardTitle className="text-white">Créer un compte</CardTitle>
             <CardDescription className="text-slate-400">
-              Inscrivez votre entreprise sur AfrivoiceAI
+              Inscrivez votre entreprise sur AfrivoxAI
             </CardDescription>
           </CardHeader>
           <CardContent>

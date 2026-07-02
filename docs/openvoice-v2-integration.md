@@ -1,4 +1,4 @@
-# OpenVoice V2 pour AfrivoiceAI
+# OpenVoice V2 pour AfrivoxAI
 
 ## Décision produit
 
@@ -10,7 +10,7 @@ Pourquoi :
 - support du français ;
 - clonage vocal instantané ;
 - intégration plus simple qu’un moteur lourd type CosyVoice/GPT-SoVITS ;
-- adapté au MVP AfrivoiceAI : upload audio → profil voix → aperçu → utilisation future dans campagnes.
+- adapté au MVP AfrivoxAI : upload audio → profil voix → aperçu → utilisation future dans campagnes.
 
 Chatterbox reste le moteur secondaire à tester pour comparer la qualité française.
 
@@ -18,13 +18,13 @@ Chatterbox reste le moteur secondaire à tester pour comparer la qualité franç
 
 La plateforme ne lance pas OpenVoice directement dans Netlify/serverless. Le clonage voix doit tourner dans un service séparé GPU/CPU long-running.
 
-Variables d’environnement côté AfrivoiceAI :
+Variables d’environnement côté AfrivoxAI :
 
 ```bash
 OPENVOICE_API_URL=https://votre-service-openvoice.example.com
 OPENVOICE_API_KEY=secret-optionnel-pour-appeler-le-service
-OPENVOICE_CALLBACK_SECRET=secret-pour-callback-service-vers-afrivoiceai
-NEXT_PUBLIC_SITE_URL=https://votre-site-afrivoiceai.netlify.app
+OPENVOICE_CALLBACK_SECRET=secret-pour-callback-service-vers-afrivoxai
+NEXT_PUBLIC_SITE_URL=https://votre-site-afrivoxai.netlify.app
 ```
 
 Flux :
@@ -33,8 +33,8 @@ Flux :
 2. Il confirme le consentement.
 3. Il ajoute une URL audio de référence `.wav` ou `.mp3`.
 4. Il clique sur **Générer OpenVoice**.
-5. AfrivoiceAI appelle `POST {OPENVOICE_API_URL}/clone`.
-6. Le service retourne immédiatement un statut ou rappelle AfrivoiceAI sur :
+5. AfrivoxAI appelle `POST {OPENVOICE_API_URL}/clone`.
+6. Le service retourne immédiatement un statut ou rappelle AfrivoxAI sur :
    `/api/voice-cloning/openvoice/callback`.
 7. La plateforme sauvegarde : statut, ID voix externe, URL d’aperçu audio.
 
@@ -64,7 +64,7 @@ Payload :
   "profileId": "uuid",
   "name": "Voix commerciale",
   "referenceAudioUrl": "https://.../sample.wav",
-  "text": "Bonjour, je suis votre assistant AfrivoiceAI...",
+  "text": "Bonjour, je suis votre assistant AfrivoxAI...",
   "language": "fr",
   "callbackUrl": "https://site/api/voice-cloning/openvoice/callback"
 }
@@ -90,7 +90,7 @@ Ou réponse asynchrone :
 }
 ```
 
-### Callback vers AfrivoiceAI
+### Callback vers AfrivoxAI
 
 ```http
 POST /api/voice-cloning/openvoice/callback

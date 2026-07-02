@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const outputDir = path.join(os.tmpdir(), "afrivoiceai-vapi-ewe-tts");
+  const outputDir = path.join(os.tmpdir(), "afrivoxai-vapi-ewe-tts");
   await mkdir(outputDir, { recursive: true });
   const wavPath = path.join(outputDir, `${randomUUID()}.wav`);
   const pcmPath = path.join(outputDir, `${randomUUID()}.pcm`);

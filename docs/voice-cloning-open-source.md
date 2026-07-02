@@ -1,10 +1,10 @@
-# Clonage de voix open source — recherche et architecture AfriVoiceAI
+# Clonage de voix open source — recherche et architecture AfrivoxAI
 
 Date: 2026-06-20
 
 ## Objectif produit
 
-Permettre à une organisation de créer une voix personnalisée, avec consentement explicite, puis de proposer cette voix dans les agents d’appel AfrivoiceAI au même titre que les voix françaises ou les voix locales.
+Permettre à une organisation de créer une voix personnalisée, avec consentement explicite, puis de proposer cette voix dans les agents d’appel AfrivoxAI au même titre que les voix françaises ou les voix locales.
 
 Flux cible :
 
@@ -32,7 +32,7 @@ Flux cible :
   - c’est surtout un pipeline de clonage/conversion de timbre ; selon la langue, on doit tester naturel/latence.
   - pour les appels temps réel, il faut un service long-running, idéalement GPU.
 
-Verdict: premier choix pour AfriVoiceAI MVP, surtout parce que la licence est claire.
+Verdict: premier choix pour AfrivoxAI MVP, surtout parce que la licence est claire.
 
 ### 2. VoxCPM2 — très prometteur, plus lourd
 
@@ -104,7 +104,7 @@ Verdict: utile techniquement mais pas mon premier choix commercial sans vérific
 - Chatterbox: https://github.com/resemble-ai/chatterbox — MIT, prometteur, à tester avec API/serveur.
 - MetaVoice: https://github.com/metavoiceio/metavoice-src — Apache-2.0, surtout voix anglais US/UK, moins prioritaire Afrique/français.
 
-## Recommandation produit AfriVoiceAI
+## Recommandation produit AfrivoxAI
 
 ### Phase 1 — Fondations SaaS sécurisées
 

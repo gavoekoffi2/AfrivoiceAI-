@@ -83,10 +83,10 @@ type LeadInput = {
 };
 
 const DEFAULT_QUICK_CALL_OBJECTIVE =
-  "Tester AfrivoiceAI sur quelques numéros, qualifier l'intérêt et proposer une démonstration.";
+  "Tester AfrivoxAI sur quelques numéros, qualifier l'intérêt et proposer une démonstration.";
 
 const DEFAULT_QUICK_CALL_SCRIPT =
-  "Tu es l'agent vocal AfrivoiceAI. Salue poliment, explique en moins de 20 secondes que l'appel sert à présenter un assistant IA capable de gérer des appels clients, demande si la personne est intéressée par une démonstration, puis termine proprement en remerciant.";
+  "Tu es l'agent vocal AfrivoxAI. Salue poliment, explique en moins de 20 secondes que l'appel sert à présenter un assistant IA capable de gérer des appels clients, demande si la personne est intéressée par une démonstration, puis termine proprement en remerciant.";
 
 function cleanOptional(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;

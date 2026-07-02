@@ -99,7 +99,7 @@ export function VoiceCloneProfileForm() {
           className="mt-1"
         />
         <span>
-          Je confirme que la voix appartient à moi ou à une personne qui a donné une autorisation explicite pour créer et utiliser ce clone vocal dans les agents AfrivoiceAI.
+          Je confirme que la voix appartient à moi ou à une personne qui a donné une autorisation explicite pour créer et utiliser ce clone vocal dans les agents AfrivoxAI.
         </span>
       </label>
 

@@ -119,7 +119,7 @@ export default async function CallsPage({
           Historique des appels
         </h2>
         <p className="text-muted-foreground">
-          Tous les appels passés via AfrivoiceAI — e-commerce et prospection
+          Tous les appels passés via AfrivoxAI — e-commerce et prospection
         </p>
       </div>
 

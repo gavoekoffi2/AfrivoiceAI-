@@ -10,8 +10,8 @@ services:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
-    image: afrivoice-ai-web:latest
-    container_name: afrivoice-ai-web
+    image: afrivox-ai-web:latest
+    container_name: afrivox-ai-web
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -35,7 +35,7 @@ services:
     depends_on:
       - db
     networks:
-      - afrivoice-network
+      - afrivox-network
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
       interval: 30s
@@ -45,19 +45,19 @@ services:
   # Base de données PostgreSQL locale (alternative à Supabase Cloud)
   db:
     image: postgres:16-alpine
-    container_name: afrivoice-ai-db
+    container_name: afrivox-ai-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_production}
-      POSTGRES_DB: ${POSTGRES_DB:-afrivoice}
+      POSTGRES_DB: ${POSTGRES_DB:-afrivox}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./src/supabase/migrations/seed.sql:/docker-entrypoint-initdb.d/seed.sql:ro
     networks:
-      - afrivoice-network
+      - afrivox-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
@@ -67,7 +67,7 @@ services:
   # Reverse proxy Nginx avec SSL
   nginx:
     image: nginx:alpine
-    container_name: afrivoice-nginx
+    container_name: afrivox-nginx
     restart: unless-stopped
     ports:
       - "80:80"
@@ -79,7 +79,7 @@ services:
     depends_on:
       - web
     networks:
-      - afrivoice-network
+      - afrivox-network
 
 volumes:
   postgres_data:
@@ -88,5 +88,5 @@ volumes:
     driver: local
 
 networks:
-  afrivoice-network:
+  afrivox-network:
     driver: bridge

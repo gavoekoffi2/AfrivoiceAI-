@@ -1,4 +1,4 @@
-// Types globaux AfrivoiceAI
+// Types globaux AfrivoxAI
 
 export type CallStatus =
   | "queued"

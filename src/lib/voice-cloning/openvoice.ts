@@ -119,5 +119,5 @@ export async function requestOpenVoiceClone(
 }
 
 export function defaultOpenVoicePreviewText() {
-  return "Bonjour, je suis votre assistant AfrivoiceAI. Cette voix a été générée à partir d’un échantillon autorisé pour vos campagnes commerciales.";
+  return "Bonjour, je suis votre assistant AfrivoxAI. Cette voix a été générée à partir d’un échantillon autorisé pour vos campagnes commerciales.";
 }

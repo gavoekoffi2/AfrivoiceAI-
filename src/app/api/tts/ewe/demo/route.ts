@@ -10,7 +10,7 @@ import { getUserSession } from "@/lib/auth";
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_TEXT =
-  "Ŋdi na mi. Nye nye AfriVoiceAI ƒe gbe ƒe kpɔɖeŋu. Míele dɔ wɔm be míaƒe agentwo nate ŋu ado go le Eʋegbe me.";
+  "Ŋdi na mi. Nye nye AfrivoxAI ƒe gbe ƒe kpɔɖeŋu. Míele dɔ wɔm be míaƒe agentwo nate ŋu ado go le Eʋegbe me.";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const outputDir = path.join(os.tmpdir(), "afrivoiceai-ewe-tts");
+  const outputDir = path.join(os.tmpdir(), "afrivoxai-ewe-tts");
   await mkdir(outputDir, { recursive: true });
   const outputPath = path.join(outputDir, `${randomUUID()}.wav`);
 

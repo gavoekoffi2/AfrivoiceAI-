@@ -107,7 +107,7 @@ export function CreateCampaignDialog() {
             <Textarea
               id="scriptTemplate"
               name="scriptTemplate"
-              placeholder={`Ex: Tu es un commercial de AfrivoiceAI. Tu appelles {leadName} de {entreprise} pour présenter notre solution de Voice AI...`}
+              placeholder={`Ex: Tu es un commercial de AfrivoxAI. Tu appelles {leadName} de {entreprise} pour présenter notre solution de Voice AI...`}
               required
               minLength={50}
               rows={5}

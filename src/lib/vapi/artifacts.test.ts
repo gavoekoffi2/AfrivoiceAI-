@@ -22,7 +22,7 @@ describe("extractVapiCallArtifacts", () => {
         recordingUrl: "https://cdn.example.com/nested.wav",
         messages: [
           { role: "system", message: "Instruction interne à ne jamais afficher." },
-          { role: "assistant", message: "Bonjour, ici AfriVoice AI." },
+          { role: "assistant", message: "Bonjour, ici AfrivoxAI." },
           { role: "user", message: "Je veux comprendre le prix." },
           { role: "assistant", content: "Je peux vous expliquer." },
         ],
@@ -35,7 +35,7 @@ describe("extractVapiCallArtifacts", () => {
       {
         speaker: "assistant",
         role: "assistant",
-        text: "Bonjour, ici AfriVoice AI.",
+        text: "Bonjour, ici AfrivoxAI.",
         timestamp: undefined,
         secondsFromStart: undefined,
       },
@@ -55,7 +55,7 @@ describe("extractVapiCallArtifacts", () => {
       },
     ]);
     expect(result.transcript).toBe(
-      "Assistant: Bonjour, ici AfriVoice AI.\nClient: Je veux comprendre le prix.\nAssistant: Je peux vous expliquer."
+      "Assistant: Bonjour, ici AfrivoxAI.\nClient: Je veux comprendre le prix.\nAssistant: Je peux vous expliquer."
     );
   });
 });

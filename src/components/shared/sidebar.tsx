@@ -106,7 +106,7 @@ export function Sidebar({ organizationName, userEmail, userRole }: SidebarProps)
         </div>
         <div className="flex min-w-0 flex-col">
           <span className="text-base font-semibold tracking-[-0.03em] text-white">
-            AfrivoiceAI
+            AfrivoxAI
           </span>
           <span className="truncate text-xs text-white/55 max-w-[160px]">
             {organizationName}

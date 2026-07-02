@@ -17,10 +17,10 @@ type QuickCallTestLead = {
 };
 
 const DEFAULT_TEST_OBJECTIVE =
-  "Tester AfrivoiceAI avec un prospect canadien réel de la base et vérifier que l'agent peut présenter la solution clairement.";
+  "Tester AfrivoxAI avec un prospect canadien réel de la base et vérifier que l'agent peut présenter la solution clairement.";
 
 const DEFAULT_TEST_SCRIPT =
-  "Tu es l'agent vocal AfrivoiceAI. Appelle en français, salue poliment, précise que c'est un court appel de test pour présenter un assistant IA capable de gérer les appels clients. Vérifie si la personne peut écouter 30 secondes, explique la valeur pour automatiser les appels entrants/sortants, demande si elle souhaite une démo plus tard, puis remercie et termine proprement.";
+  "Tu es l'agent vocal AfrivoxAI. Appelle en français, salue poliment, précise que c'est un court appel de test pour présenter un assistant IA capable de gérer les appels clients. Vérifie si la personne peut écouter 30 secondes, explique la valeur pour automatiser les appels entrants/sortants, demande si elle souhaite une démo plus tard, puis remercie et termine proprement.";
 
 function todayLabel() {
   return new Intl.DateTimeFormat("fr-FR", {
@@ -225,7 +225,7 @@ export function QuickCallLauncher() {
           id="quick-script"
           name="scriptTemplate"
           rows={4}
-          placeholder="L’agent doit saluer, expliquer brièvement AfrivoiceAI, vérifier si la personne est intéressée et résumer la réponse."
+          placeholder="L’agent doit saluer, expliquer brièvement AfrivoxAI, vérifier si la personne est intéressée et résumer la réponse."
           disabled={busy}
           value={scriptTemplate}
           onChange={(event) => setScriptTemplate(event.target.value)}

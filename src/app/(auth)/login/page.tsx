@@ -39,7 +39,7 @@ export default function LoginPage() {
           <div className="flex items-center justify-center rounded-full bg-primary/10 p-3">
             <PhoneCall className="h-8 w-8 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold text-white">AfrivoiceAI</h1>
+          <h1 className="text-3xl font-bold text-white">AfrivoxAI</h1>
           <p className="text-slate-400">La puissance de la Voice AI pour l&apos;Afrique</p>
         </div>
 
@@ -47,7 +47,7 @@ export default function LoginPage() {
           <CardHeader>
             <CardTitle className="text-white">Connexion</CardTitle>
             <CardDescription className="text-slate-400">
-              Accédez à votre espace AfrivoiceAI
+              Accédez à votre espace AfrivoxAI
             </CardDescription>
           </CardHeader>
           <CardContent>

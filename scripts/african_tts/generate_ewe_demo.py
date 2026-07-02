@@ -18,7 +18,7 @@ import torch
 from transformers import AutoTokenizer, VitsModel
 
 DEFAULT_TEXT = (
-    "Ŋdi na mi. Nye nye AfriVoiceAI ƒe gbe ƒe kpɔɖeŋu. "
+    "Ŋdi na mi. Nye nye AfrivoxAI ƒe gbe ƒe kpɔɖeŋu. "
     "Míele dɔ wɔm be míaƒe agentwo nate ŋu ado go le Eʋegbe me."
 )
 MODEL_ID = "facebook/mms-tts-ewe"

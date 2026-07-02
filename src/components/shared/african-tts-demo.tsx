@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const DEFAULT_TEXT =
-  "Ŋdi na mi. Nye nye AfriVoiceAI ƒe gbe ƒe kpɔɖeŋu. Míele dɔ wɔm be míaƒe agentwo nate ŋu ado go le Eʋegbe me.";
+  "Ŋdi na mi. Nye nye AfrivoxAI ƒe gbe ƒe kpɔɖeŋu. Míele dɔ wɔm be míaƒe agentwo nate ŋu ado go le Eʋegbe me.";
 
 type TtsResponse = {
   ok: boolean;

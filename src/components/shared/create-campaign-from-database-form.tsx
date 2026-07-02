@@ -57,7 +57,7 @@ export function CreateCampaignFromDatabaseForm({
       />
       <Textarea
         name="objective"
-        defaultValue="Présenter AfrivoiceAI et qualifier les entreprises intéressées par un assistant IA qui répond aux appels clients 24/7."
+        defaultValue="Présenter AfrivoxAI et qualifier les entreprises intéressées par un assistant IA qui répond aux appels clients 24/7."
         rows={3}
         disabled={disabled || isPending}
       />

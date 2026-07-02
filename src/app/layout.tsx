@@ -7,7 +7,7 @@ import { ThemeProvider } from "@/components/shared/theme-provider";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "AfrivoiceAI - Plateforme de Voice AI pour l'Afrique",
+  title: "AfrivoxAI - Plateforme de Voice AI pour l'Afrique",
   description:
     "Automatisez vos appels téléphoniques avec l'Intelligence Artificielle. Confirmation de commandes COD, prospection B2B, et plus encore.",
   keywords: ["voice AI", "Africa", "appels automatisés", "e-commerce", "Togo"],

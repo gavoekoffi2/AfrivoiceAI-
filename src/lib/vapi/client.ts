@@ -91,7 +91,7 @@ export function getLanguageRules(language: AgentVoiceLanguage) {
 
 export function getFirstMessageForLanguage(language: AgentVoiceLanguage, fallbackFrench: string) {
   if (language === "ewe") {
-    return "Ŋdi na mi. Nye nye Afri Voice ƒe dɔla. Mele ka bom be mawɔ nya kpui aɖe kpli wò. Ne èdi la, mate ŋu akɔ dɔa dzi le français me.";
+    return "Ŋdi na mi. Nye nye Afrivox ƒe dɔla. Mele ka bom be mawɔ nya kpui aɖe kpli wò. Ne èdi la, mate ŋu akɔ dɔa dzi le français me.";
   }
 
   return fallbackFrench;

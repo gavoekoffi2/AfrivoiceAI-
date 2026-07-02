@@ -19,7 +19,7 @@ uv pip install --python .venv-african-tts/bin/python "transformers>=4.38" "torch
 
 ```bash
 .venv-african-tts/bin/python scripts/african_tts/generate_ewe_demo.py \
-  --text "Ŋdi na mi. Nye nye AfriVoiceAI ƒe gbe ƒe kpɔɖeŋu." \
+  --text "Ŋdi na mi. Nye nye AfrivoxAI ƒe gbe ƒe kpɔɖeŋu." \
   --output artifacts/african_tts/ewe_demo.wav
 ```
 

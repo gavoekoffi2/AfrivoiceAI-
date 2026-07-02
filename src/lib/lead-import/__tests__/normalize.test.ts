@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { normalizeLeadImportRows } from "../normalize";
 
 describe("normalizeLeadImportRows", () => {
-  it("maps French/English doctor columns into AfrivoiceAI lead database records", () => {
+  it("maps French/English doctor columns into AfrivoxAI lead database records", () => {
     const { records, stats } = normalizeLeadImportRows(
       [
         {

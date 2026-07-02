@@ -175,7 +175,7 @@ export async function createCampaignFromLeadDatabaseAction(formData: FormData) {
           organizationId: session.organizationId,
           name,
           objective,
-          scriptTemplate: `Tu es l'assistant AfrivoiceAI. Objectif: ${objective}. Utilise un ton professionnel, court et respectueux. Si le prospect refuse, remercie et termine proprement. Base source: ${database.name}.`,
+          scriptTemplate: `Tu es l'assistant AfrivoxAI. Objectif: ${objective}. Utilise un ton professionnel, court et respectueux. Si le prospect refuse, remercie et termine proprement. Base source: ${database.name}.`,
           voiceLanguage,
           status: "draft",
           totalLeads: 0,

@@ -98,7 +98,7 @@ export default async function DashboardOverview() {
               Pilotez vos appels, campagnes et prospects depuis un espace premium.
             </h2>
             <p className="mt-3 max-w-xl text-muted-foreground">
-              Bienvenue sur AfrivoiceAI — {session.organizationName}. Lancez un test, achetez une base ou suivez vos résultats en temps réel.
+              Bienvenue sur AfrivoxAI — {session.organizationName}. Lancez un test, achetez une base ou suivez vos résultats en temps réel.
             </p>
           </div>
           <div className="grid gap-2 text-sm sm:grid-cols-3 lg:min-w-[360px]">
