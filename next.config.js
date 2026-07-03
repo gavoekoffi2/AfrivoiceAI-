@@ -17,6 +17,9 @@ const nextConfig = {
     serverActions: {
       allowedOrigins: [
         "localhost:3000",
+        "127.0.0.1:3000",
+        "afrivoxai.com",
+        "www.afrivoxai.com",
         process.env.NEXT_PUBLIC_SITE_URL?.replace(/^https?:\/\//, "") ?? "",
       ].filter(Boolean),
     },

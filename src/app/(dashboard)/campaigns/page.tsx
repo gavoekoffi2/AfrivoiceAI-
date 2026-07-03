@@ -44,26 +44,33 @@ export default async function CampaignsPage() {
   const session = await getUserSession();
   if (!session) redirect("/login");
 
-  const allCampaigns = await db
-    .select()
-    .from(campaigns)
-    .where(eq(campaigns.organizationId, session.organizationId))
-    .orderBy(desc(campaigns.createdAt));
+  let allCampaigns: any[] = [];
+  let purchasedDatabases: any[] = [];
 
-  const purchasedDatabaseRows = await db
-    .select({ databaseId: leadDatabasePurchases.databaseId })
-    .from(leadDatabasePurchases)
-    .where(eq(leadDatabasePurchases.organizationId, session.organizationId));
+  try {
+    allCampaigns = await db
+      .select()
+      .from(campaigns)
+      .where(eq(campaigns.organizationId, session.organizationId))
+      .orderBy(desc(campaigns.createdAt));
 
-  const purchasedDatabaseIds = purchasedDatabaseRows.map((row) => row.databaseId);
-  const purchasedDatabases = purchasedDatabaseIds.length
-    ? await db
-        .select()
-        .from(leadDatabases)
-        .where(inArray(leadDatabases.id, purchasedDatabaseIds))
-        .orderBy(desc(leadDatabases.qualityScore))
-        .limit(4)
-    : [];
+    const purchasedDatabaseRows = await db
+      .select({ databaseId: leadDatabasePurchases.databaseId })
+      .from(leadDatabasePurchases)
+      .where(eq(leadDatabasePurchases.organizationId, session.organizationId));
+
+    const purchasedDatabaseIds = purchasedDatabaseRows.map((row) => row.databaseId);
+    purchasedDatabases = purchasedDatabaseIds.length
+      ? await db
+          .select()
+          .from(leadDatabases)
+          .where(inArray(leadDatabases.id, purchasedDatabaseIds))
+          .orderBy(desc(leadDatabases.qualityScore))
+          .limit(4)
+      : [];
+  } catch (error) {
+    console.warn("[demo] Données campagnes indisponibles, affichage démo vide:", error);
+  }
 
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">

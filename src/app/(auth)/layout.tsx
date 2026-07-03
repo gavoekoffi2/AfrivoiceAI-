@@ -1,14 +1,8 @@
-import type { Metadata } from "next";
+import type { ReactNode } from "react";
 
-export const metadata: Metadata = {
-  title: "AfrivoxAI — Connexion",
-  description: "Connectez-vous à votre espace AfrivoxAI",
-};
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-export default function AuthLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return <>{children}</>;
+export default function AuthLayout({ children }: { children: ReactNode }) {
+  return children;
 }
