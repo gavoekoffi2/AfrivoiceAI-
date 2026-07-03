@@ -167,6 +167,49 @@ export default async function CallsPage({
         ))}
       </div>
 
+      {/* Campagnes réalisées */}
+      <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/10 via-background to-background">
+        <CardHeader>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <PhoneCall className="h-5 w-5 text-primary" />
+                Campagne réalisée : mobilisation pour une conférence
+              </CardTitle>
+              <CardDescription className="mt-2 max-w-3xl text-sm leading-6">
+                AfrivoxAI a été utilisé pour lancer une campagne d’appels automatisés afin d’informer,
+                relancer et mobiliser des participants autour d’un événement. Cet extrait nettoyé montre
+                comment un agent vocal IA peut présenter l’objet de l’appel, qualifier l’intérêt et faciliter
+                le suivi des contacts.
+              </CardDescription>
+            </div>
+            <Badge variant="success" className="w-fit shrink-0">
+              Appel réel nettoyé
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <audio
+            controls
+            preload="metadata"
+            className="w-full"
+            src="/demos/campagne-conference-extrait.mp3"
+          >
+            Votre navigateur ne supporte pas la lecture audio.
+          </audio>
+          <div className="flex flex-col gap-2 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
+            <span>
+              Démonstration utilisable pour présenter les campagnes déjà réalisées avec AfrivoxAI.
+            </span>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/demos/campagne-conference-demo.mp4" target="_blank">
+                Ouvrir la vidéo démo
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Filtres */}
       <Card>
         <CardHeader className="pb-3">

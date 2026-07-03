@@ -94,7 +94,7 @@ export async function registerAction(formData: FormData) {
     };
   }
 
-  redirect("/");
+  redirect("/calls");
 }
 
 export async function loginAction(formData: FormData) {
@@ -119,7 +119,7 @@ export async function loginAction(formData: FormData) {
     return { error: "Email ou mot de passe incorrect." };
   }
 
-  redirect("/");
+  redirect("/calls");
 }
 
 export async function logoutAction() {
