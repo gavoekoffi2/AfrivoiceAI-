@@ -10,6 +10,8 @@ import { GenerateOpenVoiceCloneButton } from "@/components/shared/generate-openv
 import { checkOpenVoiceService } from "@/lib/voice-cloning/openvoice";
 import { Mic2, ShieldCheck, Cpu, ExternalLink, ServerCog } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 const engines = [
   {
     name: "OpenVoice V2",

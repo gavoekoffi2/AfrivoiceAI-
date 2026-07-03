@@ -29,6 +29,8 @@ import { LeadsImporter } from "@/components/shared/leads-importer";
 import { ManualLeadForm } from "@/components/shared/manual-lead-form";
 import { CampaignBatchCaller } from "@/components/shared/campaign-batch-caller";
 
+export const dynamic = "force-dynamic";
+
 export default async function CampaignDetailPage({
   params,
 }: {

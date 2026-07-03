@@ -37,6 +37,8 @@ import {
 } from "@/lib/utils";
 import { AudioPlayer } from "@/components/shared/audio-player";
 
+export const dynamic = "force-dynamic";
+
 const callStatusColors: Record<string, "success" | "destructive" | "warning" | "secondary" | "info"> = {
   completed: "success",
   failed: "destructive",

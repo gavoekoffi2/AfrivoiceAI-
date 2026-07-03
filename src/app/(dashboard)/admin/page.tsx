@@ -10,6 +10,8 @@ import { db } from "@/lib/db";
 import { campaigns, calls, leadDatabasePurchases, leadDatabaseRecords, leadDatabases, organizations, users, wallets } from "@/lib/db/schema";
 import { ensureFounderSuperAdminAction, grantSubscriptionAction, manualWalletRechargeAction, unlockDatabaseForUserAction, updateAdminPermissionsAction, updateUserStatusAction } from "@/app/actions/admin";
 
+export const dynamic = "force-dynamic";
+
 function fmt(value: number) {
   return value.toLocaleString("fr-FR");
 }

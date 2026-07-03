@@ -25,6 +25,8 @@ import {
 import { formatFcfa, formatDuration, getCallStatusLabel } from "@/lib/utils";
 import { CallsChart } from "@/components/shared/calls-chart";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardOverview() {
   const session = await requireSession();
 

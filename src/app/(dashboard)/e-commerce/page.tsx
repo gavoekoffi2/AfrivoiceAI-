@@ -28,6 +28,8 @@ import {
 import { formatFcfa, getOrderStatusLabel } from "@/lib/utils";
 import { ManualCallButton } from "@/components/shared/manual-call-button";
 
+export const dynamic = "force-dynamic";
+
 const statusConfig = {
   pending: {
     label: "En attente",

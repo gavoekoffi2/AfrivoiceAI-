@@ -29,6 +29,8 @@ import { CreateCampaignDialog } from "@/components/shared/create-campaign-dialog
 import { QuickCallLauncher } from "@/components/shared/quick-call-launcher";
 import { CreateCampaignFromDatabaseForm } from "@/components/shared/create-campaign-from-database-form";
 
+export const dynamic = "force-dynamic";
+
 const statusConfig = {
   draft: { label: "Brouillon", variant: "secondary" as const, icon: Clock },
   active: { label: "Active", variant: "success" as const, icon: Play },

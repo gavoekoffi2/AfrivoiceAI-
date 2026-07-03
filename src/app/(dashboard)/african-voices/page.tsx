@@ -2,6 +2,8 @@ import { AfricanTtsDemo } from "@/components/shared/african-tts-demo";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
+export const dynamic = "force-dynamic";
+
 export default function AfricanVoicesPage() {
   return (
     <div className="space-y-6 p-6">

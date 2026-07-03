@@ -33,6 +33,8 @@ import {
 import { getExchangeRateInfo } from "@/lib/utils/billing";
 import { SettingsForm } from "@/components/shared/settings-form";
 
+export const dynamic = "force-dynamic";
+
 export default async function SettingsPage() {
   const session = await getUserSession();
   if (!session) redirect("/login");

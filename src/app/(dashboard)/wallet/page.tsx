@@ -14,6 +14,8 @@ import { formatFcfa } from "@/lib/utils";
 import { WalletDepositButton } from "@/components/shared/wallet-deposit-button";
 import type { Transaction } from "@/lib/db/schema";
 
+export const dynamic = "force-dynamic";
+
 export default async function WalletPage() {
   const session = await getUserSession();
   if (!session) redirect("/login");

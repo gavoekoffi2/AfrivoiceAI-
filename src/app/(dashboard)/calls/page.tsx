@@ -24,6 +24,8 @@ import {
 import { formatFcfa, formatDuration, getCallStatusLabel } from "@/lib/utils";
 import { CallsFilter } from "@/components/shared/calls-filter";
 
+export const dynamic = "force-dynamic";
+
 const callStatusColors: Record<
   string,
   "success" | "destructive" | "warning" | "secondary" | "info"
