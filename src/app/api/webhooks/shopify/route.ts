@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { orders, organizations } from "@/lib/db/schema";
 import { verifyShopifyWebhook, isCashOnDelivery } from "@/lib/shopify/verify";
 import { normalizePhoneNumber } from "@/lib/utils";
+import { triggerInternalCall } from "@/lib/internal/jobs";
 
 interface ShopifyOrderPayload {
   id: number;
@@ -56,15 +58,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ received: true, action: "ignored_non_cod" });
     }
 
-    // Trouver l'organisation via le domaine Shopify (simplifié ici)
-    // En production, mapper shopDomain → organizationId via une table de configuration
-    const orgResult = await db.select().from(organizations).limit(1);
+    // Router la commande vers la BONNE organisation via le domaine Shopify.
+    // Isolation multi-tenant : une commande n'est acceptée que si son domaine
+    // est explicitement rattaché à une organisation.
+    if (!shopDomain) {
+      console.warn("[shopify/webhook] En-tête x-shopify-shop-domain manquant");
+      return NextResponse.json(
+        { error: "Domaine boutique manquant" },
+        { status: 400 }
+      );
+    }
+
+    const orgResult = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.shopDomain, shopDomain))
+      .limit(1);
     const organization = orgResult[0];
 
     if (!organization) {
-      console.error("[shopify/webhook] Aucune organisation trouvée");
+      console.error(
+        `[shopify/webhook] Aucune organisation rattachée au domaine ${shopDomain}`
+      );
       return NextResponse.json(
-        { error: "Organisation introuvable" },
+        { error: "Domaine boutique non rattaché à une organisation" },
         { status: 404 }
       );
     }
@@ -133,16 +150,9 @@ export async function POST(req: Request) {
       `[shopify/webhook] Commande COD créée: ${insertedOrder[0].id} pour ${customerName}`
     );
 
-    // Déclencher l'appel de confirmation de manière asynchrone
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-    fetch(`${baseUrl}/api/calls/initiate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-internal-secret": process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
-      },
-      body: JSON.stringify({ orderId: insertedOrder[0].id }),
-    }).catch((err) => {
+    // Déclencher l'appel de confirmation via un token interne DÉDIÉ
+    // (jamais la clé service_role, qui donne un accès total à la base).
+    await triggerInternalCall({ orderId: insertedOrder[0].id }).catch((err) => {
       console.error(
         `[shopify/webhook] Erreur déclenchement appel pour commande ${insertedOrder[0].id}:`,
         err

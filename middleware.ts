@@ -40,7 +40,18 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  const protectedRoutes = ["/", "/e-commerce", "/campaigns", "/calls", "/wallet", "/settings"];
+  const protectedRoutes = [
+    "/",
+    "/admin",
+    "/e-commerce",
+    "/campaigns",
+    "/calls",
+    "/wallet",
+    "/settings",
+    "/voice-cloning",
+    "/african-voices",
+    "/lead-databases",
+  ];
   const isProtectedPage = protectedRoutes.some((route) =>
     route === "/" ? pathname === "/" : pathname === route || pathname.startsWith(`${route}/`)
   );

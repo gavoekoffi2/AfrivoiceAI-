@@ -14,6 +14,11 @@ import {
 } from "@/lib/vapi/client";
 import { hasSufficientBalance } from "@/lib/utils/billing";
 import { getUserSession } from "@/lib/auth";
+import { isInternalJobRequest } from "@/lib/internal/jobs";
+import {
+  buildVapiModel,
+  getMaxCallDurationSeconds,
+} from "@/lib/vapi/assistant-config";
 import { normalizePhoneNumber } from "@/lib/utils";
 import type { Vapi } from "@vapi-ai/server-sdk";
 import { buildProspectingFirstMessage } from "@/lib/prospecting";
@@ -59,12 +64,9 @@ function createLocalFailedCallId(): string {
 
 export async function POST(req: Request) {
   try {
-    // Vérifier l'authentification (via session OU appel interne)
-    const internalSecret = req.headers.get("x-internal-secret");
-    const isInternalCall =
-      internalSecret === process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (isInternalCall) {
+    // Vérifier l'authentification (via session OU appel interne).
+    // L'appel interne utilise un token DÉDIÉ (jamais la clé service_role).
+    if (isInternalJobRequest(req)) {
       // Appel depuis le webhook Shopify — récupérer l'org depuis la commande
       const body = await req.json();
       const { orderId } = body;
@@ -190,14 +192,8 @@ async function initiateEcommerceCall(
       },
       assistant: {
         server: getVapiWebhookServer(),
-        model: {
-          provider: "google",
-          model: "gemini-1.5-flash",
-          messages: [{ role: "system", content: systemPrompt }],
-          tools: [{ type: "endCall" }],
-          maxTokens: 250,
-          temperature: 0.7,
-        },
+        model: buildVapiModel(systemPrompt, 250),
+        maxDurationSeconds: getMaxCallDurationSeconds(),
         voice: getFrenchElevenLabsVoice(),
         firstMessage: `Bonjour ${order.customerName}, c'est Amina de la boutique ${shopName}. Je vous appelle pour confirmer votre commande. Avez-vous quelques instants ?`,
         endCallMessage: "Merci beaucoup. Je vous souhaite une excellente journée.",
@@ -340,14 +336,8 @@ async function initiateProspectingCall(
       },
       assistant: {
         server: getVapiWebhookServer(),
-        model: {
-          provider: "google",
-          model: "gemini-1.5-flash",
-          messages: [{ role: "system", content: systemPrompt }],
-          tools: [{ type: "endCall" }],
-          maxTokens: 300,
-          temperature: 0.7,
-        },
+        model: buildVapiModel(systemPrompt, 300),
+        maxDurationSeconds: getMaxCallDurationSeconds(),
         voice: getAgentVoice(voiceLanguage),
         firstMessage: getFirstMessageForLanguage(
           voiceLanguage,

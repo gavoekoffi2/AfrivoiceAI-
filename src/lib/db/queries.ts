@@ -10,23 +10,13 @@ export type OrganizationStats = {
   activeCampaigns: number;
 };
 
-const DEMO_STATS: OrganizationStats = {
-  totalCalls: 128,
-  confirmedOrders: 47,
-  confirmationRate: 64,
-  walletBalance: 75000,
-  activeCampaigns: 3,
+const EMPTY_STATS: OrganizationStats = {
+  totalCalls: 0,
+  confirmedOrders: 0,
+  confirmationRate: 0,
+  walletBalance: 0,
+  activeCampaigns: 0,
 };
-
-const DEMO_CHART = [
-  { date: "Lun", total: 9, completed: 6 },
-  { date: "Mar", total: 14, completed: 9 },
-  { date: "Mer", total: 18, completed: 12 },
-  { date: "Jeu", total: 22, completed: 15 },
-  { date: "Ven", total: 31, completed: 21 },
-  { date: "Sam", total: 17, completed: 11 },
-  { date: "Dim", total: 24, completed: 16 },
-];
 
 export async function getOrganizationStats(
   organizationId: string
@@ -98,8 +88,9 @@ export async function getOrganizationStats(
       activeCampaigns,
     };
   } catch (error) {
-    console.warn("[demo] Statistiques DB indisponibles, fallback démo:", error);
-    return DEMO_STATS;
+    // Fail-closed : jamais de fausses statistiques. On renvoie des zéros réels.
+    console.error("[queries] getOrganizationStats a échoué:", error);
+    return EMPTY_STATS;
   }
 }
 
@@ -115,7 +106,7 @@ export async function getRecentCalls(
       .orderBy(desc(calls.createdAt))
       .limit(limit);
   } catch (error) {
-    console.warn("[demo] Appels récents DB indisponibles, fallback démo:", error);
+    console.error("[queries] getRecentCalls a échoué:", error);
     return [];
   }
 }
@@ -138,10 +129,10 @@ export async function getCallsChartData(organizationId: string) {
       .groupBy(sql`DATE(${calls.createdAt})`)
       .orderBy(sql`DATE(${calls.createdAt})`);
 
-    return result.length ? result : DEMO_CHART;
+    return result;
   } catch (error) {
-    console.warn("[demo] Graphique appels DB indisponible, fallback démo:", error);
-    return DEMO_CHART;
+    console.error("[queries] getCallsChartData a échoué:", error);
+    return [];
   }
 }
 
@@ -153,19 +144,9 @@ export async function getWalletWithTransactions(organizationId: string) {
       .where(eq(wallets.organizationId, organizationId))
       .limit(1);
 
-    if (!wallet[0]) {
-      return {
-        wallet: {
-          id: "demo-wallet",
-          organizationId,
-          balanceFcfa: "75000",
-          currency: "XOF",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        transactions: [],
-      };
-    }
+    // Aucun wallet : on renvoie null (pas de solde fictif). Les appelants
+    // gèrent déjà ce cas (404 côté API, « 0 FCFA » côté UI).
+    if (!wallet[0]) return null;
 
     const txHistory = await db
       .select()
@@ -176,17 +157,8 @@ export async function getWalletWithTransactions(organizationId: string) {
 
     return { wallet: wallet[0], transactions: txHistory };
   } catch (error) {
-    console.warn("[demo] Wallet DB indisponible, fallback démo:", error);
-    return {
-      wallet: {
-        id: "demo-wallet",
-        organizationId,
-        balanceFcfa: "75000",
-        currency: "XOF",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-      transactions: [],
-    };
+    // Fail-closed : jamais de solde fictif.
+    console.error("[queries] getWalletWithTransactions a échoué:", error);
+    return null;
   }
 }

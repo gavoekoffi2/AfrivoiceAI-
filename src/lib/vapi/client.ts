@@ -44,7 +44,13 @@ export type AgentVoiceLanguage = "fr" | "ewe";
 export function getEweCustomVoice(): Vapi.CreateAssistantDtoVoice {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
   if (!siteUrl) {
-    throw new Error("NEXT_PUBLIC_SITE_URL requis pour la voix Éwé custom Vapi");
+    // Sans URL publique, la voix éwé custom (endpoint TTS) est injoignable.
+    // On dégrade proprement vers la voix française plutôt que de faire échouer
+    // tout l'appel.
+    console.error(
+      "[vapi] NEXT_PUBLIC_SITE_URL manquant : repli sur la voix française pour l'éwé"
+    );
+    return getFrenchVoice();
   }
 
   return {

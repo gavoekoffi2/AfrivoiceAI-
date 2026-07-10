@@ -43,8 +43,14 @@ function cleanText(text: unknown) {
 }
 
 export async function POST(request: Request) {
+  // Fail-closed : cet endpoint est appelé par Vapi (custom-voice) et exécute
+  // du calcul TTS coûteux. Sans secret configuré, on refuse toute requête.
   const configuredSecret = process.env.AFRICAN_TTS_VAPI_SECRET;
-  if (configuredSecret && getSecret(request) !== configuredSecret) {
+  if (!configuredSecret) {
+    console.error("[tts:ewe:vapi] AFRICAN_TTS_VAPI_SECRET non configuré");
+    return NextResponse.json({ error: "TTS endpoint non configuré" }, { status: 503 });
+  }
+  if (getSecret(request) !== configuredSecret) {
     return NextResponse.json({ error: "Unauthorized TTS request" }, { status: 401 });
   }
 

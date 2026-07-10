@@ -5,6 +5,10 @@ import { campaigns, leads, calls, wallets } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { hasSufficientBalance } from "@/lib/utils/billing";
 import { getFrenchElevenLabsVoice, getVapiClient, generateProspectingPrompt } from "@/lib/vapi/client";
+import {
+  buildVapiModel,
+  getMaxCallDurationSeconds,
+} from "@/lib/vapi/assistant-config";
 import { normalizePhoneNumber } from "@/lib/utils";
 import type { Vapi } from "@vapi-ai/server-sdk";
 import { buildProspectingFirstMessage } from "@/lib/prospecting";
@@ -153,14 +157,8 @@ export async function POST(
             name: lead.name ?? undefined,
           },
           assistant: {
-            model: {
-              provider: "google",
-              model: "gemini-1.5-flash",
-              messages: [{ role: "system", content: systemPrompt }],
-              tools: [{ type: "endCall" }],
-              maxTokens: 300,
-              temperature: 0.7,
-            },
+            model: buildVapiModel(systemPrompt, 300),
+            maxDurationSeconds: getMaxCallDurationSeconds(),
             voice: getFrenchElevenLabsVoice(),
             firstMessage: buildProspectingFirstMessage({
               leadName: lead.name,

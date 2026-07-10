@@ -6,6 +6,7 @@ import { verifyVapiWebhook } from "@/lib/vapi/verify";
 import { calculateClientCostFcfa } from "@/lib/utils/billing";
 import { classifyProspectingOutcome } from "@/lib/prospecting";
 import { extractVapiCallArtifacts } from "@/lib/vapi/artifacts";
+import { analyzeOrderCallOutcome } from "@/lib/calls/outcome";
 
 interface VapiEndOfCallReport {
   message: {
@@ -37,49 +38,6 @@ interface VapiStatusUpdate {
 }
 
 type VapiWebhookPayload = VapiEndOfCallReport | VapiStatusUpdate;
-
-/**
- * Analyse le résumé de l'appel pour déterminer le résultat de la commande
- */
-function analyzeCallOutcome(
-  summary: string,
-  transcript: string
-): "confirmed" | "cancelled" | "no_answer" {
-  const combined = `${summary} ${transcript}`.toLowerCase();
-
-  const cancelKeywords = [
-    "annul",
-    "annulé",
-    "pas intéressé",
-    "non",
-    "refuse",
-    "ne veut pas",
-    "n'est pas intéressé",
-  ];
-  const confirmKeywords = [
-    "confirme",
-    "confirmé",
-    "oui",
-    "d'accord",
-    "ok",
-    "parfait",
-    "livrer",
-    "disponible",
-  ];
-  const noAnswerKeywords = [
-    "pas de réponse",
-    "messagerie",
-    "occupé",
-    "voicemail",
-    "no-answer",
-  ];
-
-  if (noAnswerKeywords.some((kw) => combined.includes(kw))) return "no_answer";
-  if (cancelKeywords.some((kw) => combined.includes(kw))) return "cancelled";
-  if (confirmKeywords.some((kw) => combined.includes(kw))) return "confirmed";
-
-  return "confirmed"; // Par défaut si l'appel s'est terminé normalement
-}
 
 export async function POST(req: Request) {
   try {
@@ -126,6 +84,16 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Appel introuvable" }, { status: 404 });
       }
 
+      // Idempotence : Vapi peut renvoyer plusieurs fois l'« end-of-call-report ».
+      // Si l'appel a déjà été finalisé (coût déjà imputé), on ne re-débite PAS
+      // le wallet une seconde fois.
+      if (dbCall.status === "completed" || dbCall.costFcfa != null) {
+        console.warn(
+          `[vapi/webhook] Rapport en double ignoré pour ${call.id} (déjà finalisé)`
+        );
+        return NextResponse.json({ received: true, duplicate: true });
+      }
+
       const costUsd = call.cost ?? 0;
       const costFcfa = calculateClientCostFcfa(costUsd);
       const durationSeconds = call.duration ?? 0;
@@ -139,10 +107,17 @@ export async function POST(req: Request) {
 
       const wallet = walletResult[0];
 
-      // Analyser l'issue de la commande
+      // Analyser l'issue de la commande. Une issue « uncertain » ne modifie PAS
+      // le statut de la commande (pas de confirmation automatique sans preuve).
       let orderOutcome: "confirmed" | "cancelled" | "no_answer" | null = null;
-      if (dbCall.orderId && summary && transcript) {
-        orderOutcome = analyzeCallOutcome(summary, transcript);
+      if (dbCall.orderId) {
+        const analyzed = analyzeOrderCallOutcome(summary, transcript);
+        orderOutcome = analyzed === "uncertain" ? null : analyzed;
+        if (analyzed === "uncertain") {
+          console.warn(
+            `[vapi/webhook] Issue indéterminée pour la commande ${dbCall.orderId} — revue manuelle requise`
+          );
+        }
       }
 
       // Transaction atomique : mettre à jour l'appel + déduire du wallet

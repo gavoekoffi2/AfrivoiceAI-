@@ -418,4 +418,42 @@ sécurité webhooks/secrets, TTS local déporté en service.
 4. **Traduction commerciale** : pas de modèle open **et** commercial fiable pour
    ces langues (NLLB/MMS/MAFAND sont CC-BY-NC). Recommandation : traduction **par
    LLM Claude** (commercial). OK ?
+
+---
+
+## 9. Statut d'implémentation — Phase 0 (socle) ✅ appliquée
+
+Décisions validées : Vapi **conservé** comme provider managé + pipeline
+auto-hébergé à ajouter ensuite ; livraison **Phase 0 seule** avant B→F ; temps
+réel sur le **Docker existant**.
+
+Correctifs livrés dans cette phase (avec tests, `typecheck` + `lint` verts,
+34 tests passants) :
+
+| Réf. audit | Correctif appliqué | Fichiers |
+|---|---|---|
+| S1 / B10 | Suppression du fallback session démo admin ; fail-closed (null) ; mode démo opt-in **non-admin** (`DEMO_MODE`) | `lib/auth.ts`, `lib/db/queries.ts` |
+| S2 | Helper `withTenant` / `withServiceContext` + migration RLS **prête, à activer par l'opérateur** avec le refactor requêtes (Partie D) | `lib/db/tenant.ts`, `migrations/0007_multi_tenant_rls.sql` |
+| S3 / B1 | Webhooks Shopify & WooCommerce routés vers la **bonne organisation** par domaine (rejet si non mappé) | `webhooks/shopify`, `webhooks/woocommerce`, `schema.ts`, `migrations/0006` |
+| S4 | Token interne **dédié** (`INTERNAL_JOB_TOKEN`) au lieu de la clé service_role | `lib/internal/jobs.ts`, `calls/initiate`, webhooks e-commerce |
+| S5 / D10 | Webhooks **fail-closed** (Vapi, WooCommerce, TTS) si secret absent | `vapi/verify.ts`, `webhooks/woocommerce`, `tts/ewe/vapi` |
+| S6 | Colonne `data_retention_days` par org (base rétention PII) | `schema.ts`, `migrations/0006` |
+| B2 / B3 | `analyzeOrderCallOutcome` : **plus de confirmation par défaut** (`uncertain`) + matching par racine (fin des faux positifs de sous-chaîne) | `lib/calls/outcome.ts`, `webhooks/vapi` |
+| B4 | **Idempotence** du rapport de fin d'appel (anti double-débit du wallet) | `webhooks/vapi` |
+| B5 | Garde-fou **durée max d'appel** (`CALL_MAX_DURATION_SECONDS`) | `lib/vapi/assistant-config.ts`, `calls/initiate`, `campaigns/launch` |
+| B6 | **Modèle LLM configurable** (env) au lieu de `gemini-1.5-flash` codé en dur | `lib/vapi/assistant-config.ts` + sites d'appel |
+| B7 | Voix éwé : **repli gracieux** au lieu d'un `throw` bloquant | `lib/vapi/client.ts` |
+| D14 | Middleware : protection étendue à **toutes** les routes dashboard | `middleware.ts` |
+
+**Important — RLS (S2)** : la migration `0007` est fournie **prête mais non
+activée automatiquement**. L'activer avant que la couche d'accès aux données ne
+route toutes les requêtes tenant via `withTenant()` renverrait des résultats
+vides. Elle sera activée avec le refactor en couches (Partie D). Les failles
+d'isolation **immédiatement exploitables** (fallback démo, webhooks première-org)
+sont, elles, **corrigées dès maintenant**.
+
+**Non couvert par Phase 0 (planifié B→F)** : couche providers complète et
+pipeline streaming, téléphonie Africa's Talking, studio agents, widget, API
+publique + rate limiting, chiffrement effectif des PII au repos, déport du TTS
+local dans le microservice voix.
 ```

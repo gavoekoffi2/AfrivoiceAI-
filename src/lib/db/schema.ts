@@ -12,13 +12,29 @@ import {
 } from "drizzle-orm/pg-core";
 
 // 1. Gestion des Utilisateurs et Organisations (Multi-tenant)
-export const organizations = pgTable("organizations", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  name: text("name").notNull(),
-  slug: text("slug").unique().notNull(),
-  shopName: text("shop_name"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const organizations = pgTable(
+  "organizations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    slug: text("slug").unique().notNull(),
+    shopName: text("shop_name"),
+    // Domaine de la boutique e-commerce, utilisé pour router les webhooks
+    // entrants (Shopify `x-shopify-shop-domain`, URL du site WooCommerce)
+    // vers la BONNE organisation. Sans mapping, un webhook est rejeté.
+    shopDomain: text("shop_domain"),
+    // Rétention configurable des données personnelles d'appel (transcripts,
+    // enregistrements, numéros). NULL = conservation par défaut plateforme.
+    // Cf. conformité loi togolaise n°2019-014 sur la protection des données.
+    dataRetentionDays: integer("data_retention_days"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    shopDomainIdx: uniqueIndex("organizations_shop_domain_unique").on(
+      table.shopDomain
+    ),
+  })
+);
 
 export const users = pgTable(
   "users",

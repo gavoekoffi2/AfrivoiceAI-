@@ -15,20 +15,30 @@ export type UserSession = {
   organizationName: string;
 };
 
-const DEMO_SESSION: UserSession = {
-  id: "00000000-0000-4000-8000-000000000001",
-  email: "demo@afrivoxai.com",
-  role: "admin",
-  subscriptionPlan: "premium",
-  subscriptionExpiresAt: null,
-  isActive: true,
-  adminPermissions: ["demo", "admin"],
-  organizationId: "00000000-0000-4000-8000-000000000010",
-  organizationName: "AfrivoxAI Demo",
-};
+/**
+ * Mode démo OPT-IN, cloisonné et NON-administrateur.
+ *
+ * Sécurité : contrairement à l'ancien comportement, aucune session n'est
+ * jamais accordée « par défaut » en cas d'échec d'authentification. Le mode
+ * démo n'est activé que si `DEMO_MODE=true` est explicitement défini, et il
+ * renvoie un simple membre (jamais admin/super_admin) rattaché à une
+ * organisation démo isolée. À ne PAS activer sur un domaine public.
+ */
+const DEMO_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000010";
 
-function getDemoSession(): UserSession {
-  return DEMO_SESSION;
+function getDemoSessionIfEnabled(): UserSession | null {
+  if (process.env.DEMO_MODE !== "true") return null;
+  return {
+    id: "00000000-0000-4000-8000-000000000001",
+    email: "demo@afrivoxai.com",
+    role: "member",
+    subscriptionPlan: "free",
+    subscriptionExpiresAt: null,
+    isActive: true,
+    adminPermissions: null,
+    organizationId: DEMO_ORGANIZATION_ID,
+    organizationName: "AfrivoxAI Demo",
+  };
 }
 
 export async function getUserSession(): Promise<UserSession | null> {
@@ -39,7 +49,8 @@ export async function getUserSession(): Promise<UserSession | null> {
       error,
     } = await supabase.auth.getUser();
 
-    if (error || !authUser) return getDemoSession();
+    // Aucune session valide : on refuse l'accès (pas de session démo admin).
+    if (error || !authUser) return getDemoSessionIfEnabled();
 
     const result = await db
       .select({
@@ -59,7 +70,8 @@ export async function getUserSession(): Promise<UserSession | null> {
       .limit(1);
 
     const session = result[0];
-    if (!session || !session.isActive) return getDemoSession();
+    // Utilisateur authentifié mais sans profil actif : accès refusé.
+    if (!session || !session.isActive) return null;
 
     return {
       ...session,
@@ -68,8 +80,11 @@ export async function getUserSession(): Promise<UserSession | null> {
         : null,
     };
   } catch (error) {
-    console.warn("[auth] Session réelle indisponible, accès démo activé:", error);
-    return getDemoSession();
+    // Fail-closed : une panne d'infrastructure ne doit JAMAIS accorder d'accès.
+    // On journalise et on renvoie « non authentifié » (401/redirection),
+    // sans jamais retomber sur une session privilégiée.
+    console.error("[auth] Échec de résolution de la session:", error);
+    return null;
   }
 }
 
