@@ -27,6 +27,13 @@ export const organizations = pgTable(
     // enregistrements, numéros). NULL = conservation par défaut plateforme.
     // Cf. conformité loi togolaise n°2019-014 sur la protection des données.
     dataRetentionDays: integer("data_retention_days"),
+    // Clé PUBLIQUE du widget embarquable (préfixe pk_). Jamais de secret ici :
+    // cette valeur est visible côté client par construction.
+    publicKey: text("public_key").unique(),
+    // Allowlist des domaines autorisés à charger le widget de cette org.
+    allowedDomains: jsonb("allowed_domains").$type<string[]>(),
+    // Plan de l'organisation (rate limiting API publique) : free|pro|enterprise.
+    plan: text("plan").default("free").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
@@ -329,6 +336,128 @@ export const calls = pgTable(
   })
 );
 
+// 7. Studio d'agents IA (plateforme marque blanche, multi-tenant)
+export const agents = pgTable(
+  "agents",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .references(() => organizations.id, { onDelete: "cascade" })
+      .notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    // Langue parlée avec l'appelant ('fr', 'en', 'ee' éwé, 'yo', 'ha'…).
+    speakLanguage: text("speak_language").default("fr").notNull(),
+    // Langue de « pensée » du LLM (traduction auto si != speakLanguage).
+    thinkLanguage: text("think_language").default("fr").notNull(),
+    // Tier de modèle ('simple' | 'default' | 'premium') ou id complet.
+    model: text("model").default("default").notNull(),
+    // Voix TTS (ex. id de voix clonée OpenVoice de l'organisation).
+    voiceId: text("voice_id"),
+    // Personnalité / instructions système rédigées dans le studio no-code.
+    systemPrompt: text("system_prompt").notNull(),
+    // Scénarios d'appel (étapes, objections, objectifs) — texte structuré.
+    callScenario: text("call_scenario"),
+    // Message d'accueil prononcé en début de conversation.
+    greeting: text("greeting"),
+    status: text("status").default("draft").notNull(), // 'draft' | 'active' | 'archived'
+    // Expose l'agent au widget web public (avec clé publique + allowlist).
+    widgetEnabled: boolean("widget_enabled").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    orgIdx: index("agents_org_idx").on(table.organizationId),
+    statusIdx: index("agents_status_idx").on(table.status),
+  })
+);
+
+export const agentKnowledge = pgTable(
+  "agent_knowledge",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    agentId: uuid("agent_id")
+      .references(() => agents.id, { onDelete: "cascade" })
+      .notNull(),
+    organizationId: uuid("organization_id")
+      .references(() => organizations.id, { onDelete: "cascade" })
+      .notNull(),
+    title: text("title").notNull(),
+    // Contenu textuel consultable par l'agent (injecté dans le contexte).
+    content: text("content").notNull(),
+    sourceUrl: text("source_url"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    agentIdx: index("agent_knowledge_agent_idx").on(table.agentId),
+    orgIdx: index("agent_knowledge_org_idx").on(table.organizationId),
+  })
+);
+
+// Journal d'appels/conversations généralisé (découplé de Vapi) : téléphonie
+// directe (Africa's Talking/Twilio), widget web, et pipeline auto-hébergé.
+export const callLogs = pgTable(
+  "call_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .references(() => organizations.id, { onDelete: "cascade" })
+      .notNull(),
+    agentId: uuid("agent_id").references(() => agents.id, {
+      onDelete: "set null",
+    }),
+    // 'africas-talking' | 'twilio' | 'vapi' | 'widget'
+    provider: text("provider").notNull(),
+    providerCallId: text("provider_call_id"),
+    direction: text("direction").default("outbound").notNull(), // 'outbound' | 'inbound'
+    channel: text("channel").default("phone").notNull(), // 'phone' | 'widget'
+    phoneNumber: text("phone_number"),
+    status: text("status").default("queued").notNull(),
+    durationSeconds: integer("duration_seconds"),
+    costFcfa: decimal("cost_fcfa", { precision: 10, scale: 2 }),
+    transcript: text("transcript"),
+    summary: text("summary"),
+    messages: jsonb("messages").$type<
+      Array<{ role: string; content: string; at?: string }>
+    >(),
+    startedAt: timestamp("started_at"),
+    endedAt: timestamp("ended_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    orgIdx: index("call_logs_org_idx").on(table.organizationId),
+    agentIdx: index("call_logs_agent_idx").on(table.agentId),
+    providerCallIdx: index("call_logs_provider_call_idx").on(
+      table.providerCallId
+    ),
+    createdAtIdx: index("call_logs_created_at_idx").on(table.createdAt),
+  })
+);
+
+// 8. Clés API de l'API publique (Partie F). Seul le hash SHA-256 est stocké.
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .references(() => organizations.id, { onDelete: "cascade" })
+      .notNull(),
+    name: text("name").notNull(),
+    // Préfixe non secret affichable (ex. "avk_live_ab12cd34") pour identifier
+    // la clé dans l'UI sans jamais réafficher le secret.
+    prefix: text("prefix").notNull(),
+    hashedKey: text("hashed_key").unique().notNull(),
+    scopes: jsonb("scopes").$type<string[]>(),
+    lastUsedAt: timestamp("last_used_at"),
+    revokedAt: timestamp("revoked_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    orgIdx: index("api_keys_org_idx").on(table.organizationId),
+    prefixIdx: index("api_keys_prefix_idx").on(table.prefix),
+  })
+);
+
 // Types inférés
 export type Organization = typeof organizations.$inferSelect;
 export type NewOrganization = typeof organizations.$inferInsert;
@@ -352,3 +481,11 @@ export type LeadDatabasePurchase = typeof leadDatabasePurchases.$inferSelect;
 export type NewLeadDatabasePurchase = typeof leadDatabasePurchases.$inferInsert;
 export type Call = typeof calls.$inferSelect;
 export type NewCall = typeof calls.$inferInsert;
+export type Agent = typeof agents.$inferSelect;
+export type NewAgent = typeof agents.$inferInsert;
+export type AgentKnowledge = typeof agentKnowledge.$inferSelect;
+export type NewAgentKnowledge = typeof agentKnowledge.$inferInsert;
+export type CallLog = typeof callLogs.$inferSelect;
+export type NewCallLog = typeof callLogs.$inferInsert;
+export type ApiKey = typeof apiKeys.$inferSelect;
+export type NewApiKey = typeof apiKeys.$inferInsert;

@@ -43,6 +43,7 @@ export async function middleware(request: NextRequest) {
   const protectedRoutes = [
     "/",
     "/admin",
+    "/agents",
     "/e-commerce",
     "/campaigns",
     "/calls",
@@ -61,12 +62,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // Protection des routes API (sauf webhooks)
-  if (
-    pathname.startsWith("/api/") &&
-    !pathname.startsWith("/api/webhooks/") &&
-    !user
-  ) {
+  // Routes API portant leur PROPRE authentification (pas de session Supabase) :
+  // - /api/webhooks/*  : signatures HMAC des fournisseurs
+  // - /api/v1/*        : clés API par organisation (API publique)
+  // - /api/widget/*    : clé publique + allowlist domaines + token éphémère
+  // - /api/telephony/* : token de callback télécom dédié
+  const selfAuthenticatedApi =
+    pathname.startsWith("/api/webhooks/") ||
+    pathname.startsWith("/api/v1/") ||
+    pathname.startsWith("/api/widget/") ||
+    pathname.startsWith("/api/telephony/");
+
+  // Protection des routes API à session
+  if (pathname.startsWith("/api/") && !selfAuthenticatedApi && !user) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 

@@ -456,4 +456,29 @@ sont, elles, **corrigées dès maintenant**.
 pipeline streaming, téléphonie Africa's Talking, studio agents, widget, API
 publique + rate limiting, chiffrement effectif des PII au repos, déport du TTS
 local dans le microservice voix.
+
+---
+
+## 10. Statut d'implémentation — Parties B→F ✅ appliquées
+
+| Partie | Livré | Emplacement |
+|---|---|---|
+| B — Providers | Interfaces `SpeechToTextProvider` / `LLMProvider` / `TranslationProvider` / `TextToSpeechProvider` / `TelephonyProvider` + factory config-driven | `src/lib/providers/` |
+| B — LLM | Claude (SSE streaming, tiers Haiku/Sonnet/Fable-Opus par env + par agent) ; Gemini en alternative | `providers/llm/` |
+| B — STT | Whisper via endpoint d'inférence configurable (`WHISPER_API_URL`), VAD par silence, streaming par énoncés (limite Whisper documentée) | `providers/stt/whisper.ts` |
+| B — Traduction | Par LLM (Claude) — choix documenté (NLLB & co = CC-BY-NC) ; stub NLLB non activable | `providers/translation/` |
+| B — TTS | OpenVoice V2 étendu : contrat `/tts` streaming ajouté à l'adapter | `providers/tts/openvoice.ts` |
+| B — Orchestrateur | `VoiceAgentPipeline` : streaming bout-en-bout, phrases → TTS pendant la génération, tour de parole, **barge-in**, erreurs par étape (STT fatale, traduction/TTS dégradées, LLM par tour) | `src/lib/pipeline/` |
+| C — Téléphonie | Africa's Talking (SDK officiel) : appels sortants + webhook voix + boucle conversation tour-par-tour (limite media streams AT documentée) ; **stub Twilio documenté** (voie < 1,5 s via Media Streams) | `providers/telephony/`, `api/telephony/`, `TELEPHONY.md` |
+| D — Studio | Tables `agents` / `agent_knowledge` / `call_logs` (+ `api_keys`), migration 0008 avec policies RLS, service domaine isolé par org, UI no-code `/agents` (création, édition, base de connaissances) | `services/agents.ts`, `(dashboard)/agents/` |
+| E — Widget | Script embarquable `widget.js` (texte + voix micro), session par **clé publique + allowlist domaines + token HMAC éphémère**, page démo `/widget-demo` | `public/widget.js`, `api/widget/` |
+| F — API publique | REST `/api/v1` (agents CRUD, calls trigger/list/detail), clés API hashées SHA-256 affichées une seule fois, révocation, **rate limiting par plan** (30/120/600 req/min) | `api/v1/`, `security/` |
+| Tests | 66 tests : orchestrateur (streaming, barge-in, erreurs par étape, traduction), sécurité (allowlist, tokens, clés API, rate limit), tenant helper, services | `*.test.ts` |
+| Docs | `INTEGRATION.md` (env, studio, widget, API), `TELEPHONY.md` (AT + Twilio) | racine |
+
+**Limites honnêtes documentées** : latence tour-par-tour d'Africa's Talking
+(3-6 s ; la cible < 1,5 s exige Twilio Media Streams ou le widget) ; rate
+limiter et cache audio par instance Node (Redis/S3 avant multi-replicas) ;
+STT Whisper par énoncés (pas de partiels intra-énoncé) ; chiffrement PII au
+repos et job de purge de rétention encore à câbler en production.
 ```

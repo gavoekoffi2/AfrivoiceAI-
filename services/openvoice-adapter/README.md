@@ -7,6 +7,17 @@ AfrivoxAI appelle ce service via `OPENVOICE_API_URL`.
 
 - `GET /health` → retourne `{"ok": true}` quand OpenVoice est prêt.
 - `POST /clone` → reçoit `profileId`, `referenceAudioUrl`, `text`, `language`, `callbackUrl`.
+- `POST /tts` → **synthèse streaming** (utilisée par le pipeline vocal, Partie B) :
+  - requête : `{ "text": "...", "voiceId": "openvoice_xxx"?, "language": "fr", "sampleRate": 24000 }`
+  - réponse : `Content-Type: application/octet-stream`, corps = PCM s16le mono
+    streamé en chunked transfer (l'audio commence à sortir avant la fin de la
+    synthèse). `voiceId` absent → voix de base OpenVoice pour la langue.
+  - erreurs : JSON `{ "message": "..." }` avec le statut HTTP approprié.
+
+Le client correspondant est `src/lib/providers/tts/openvoice.ts`
+(`OpenVoiceTtsProvider`). Tant que `/tts` n'est pas déployé, le provider
+échoue proprement et les canaux (widget, téléphonie) dégradent en texte /
+`<Say>` — jamais de fausse synthèse.
 
 ## Pourquoi pas directement dans Netlify ?
 
