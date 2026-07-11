@@ -28,11 +28,21 @@ API publique /api/v1/*        Widget /api/widget/*        Télécom /api/telepho
 
 ```bash
 # --- LLM (cerveau conversationnel) ---
-LLM_PROVIDER=claude               # claude (défaut) | gemini
+LLM_PROVIDER=claude               # claude (défaut) | openrouter | gemini
 ANTHROPIC_API_KEY=sk-ant-...
 LLM_MODEL_SIMPLE=claude-haiku-4-5     # agents simples (FAQ, RDV) — le moins cher
 LLM_MODEL_DEFAULT=claude-sonnet-4-6   # conversations standard
 LLM_MODEL_PREMIUM=claude-opus-4-8     # raisonnement complexe (ou claude-fable-5)
+
+# Alternative OpenRouter : accès multi-modèles (Claude, Gemini, Llama…) avec
+# une seule clé. ⚠ La clé sk-or-v1-… va dans .env.local (gitignoré) ou dans
+# les variables du serveur — JAMAIS dans le dépôt.
+# LLM_PROVIDER=openrouter
+# OPENROUTER_API_KEY=sk-or-v1-...
+# OPENROUTER_MODEL_SIMPLE=anthropic/claude-haiku-4.5
+# OPENROUTER_MODEL_DEFAULT=anthropic/claude-sonnet-4.5
+# OPENROUTER_MODEL_PREMIUM=anthropic/claude-opus-4.1
+# (tout id OpenRouter `fournisseur/modele` est accepté, aussi par agent)
 
 # --- STT (reconnaissance vocale) ---
 STT_PROVIDER=whisper

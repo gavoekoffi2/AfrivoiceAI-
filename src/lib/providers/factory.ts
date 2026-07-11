@@ -6,6 +6,7 @@ import {
 } from "./types";
 import { ClaudeLLMProvider } from "./llm/claude";
 import { GeminiLLMProvider } from "./llm/gemini";
+import { OpenRouterLLMProvider } from "./llm/openrouter";
 import { WhisperSttProvider } from "./stt/whisper";
 import {
   LlmTranslationProvider,
@@ -16,7 +17,7 @@ import { OpenVoiceTtsProvider } from "./tts/openvoice";
 /**
  * Sélection des providers par configuration (variables d'environnement) :
  *
- * - `LLM_PROVIDER`          : "claude" (défaut) | "gemini"
+ * - `LLM_PROVIDER`          : "claude" (défaut) | "openrouter" | "gemini"
  * - `STT_PROVIDER`          : "whisper" (défaut)
  * - `TTS_PROVIDER`          : "openvoice" (défaut) | "none"
  * - `TRANSLATION_PROVIDER`  : "llm" (défaut) | "nllb-stub" (NON déployable)
@@ -31,6 +32,8 @@ export function createLlmProvider(): LLMProvider {
   switch (name) {
     case "gemini":
       return new GeminiLLMProvider();
+    case "openrouter":
+      return new OpenRouterLLMProvider();
     case "claude":
     default:
       return new ClaudeLLMProvider();

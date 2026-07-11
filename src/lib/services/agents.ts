@@ -41,9 +41,11 @@ export function validateAgentInput(input: AgentInput): string | null {
   if (
     input.model &&
     !ALLOWED_MODELS.has(input.model) &&
-    !input.model.startsWith("claude-")
+    !input.model.startsWith("claude-") &&
+    // Id OpenRouter complet, format `fournisseur/modele`.
+    !/^[a-z0-9-]+\/[\w.:-]+$/i.test(input.model)
   ) {
-    return "Modèle invalide : utiliser simple/default/premium ou un id de modèle Claude.";
+    return "Modèle invalide : utiliser simple/default/premium, un id Claude, ou un id OpenRouter (fournisseur/modele).";
   }
   if (input.status && !ALLOWED_STATUS.has(input.status)) {
     return "Statut invalide.";
