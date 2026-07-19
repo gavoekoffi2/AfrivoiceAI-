@@ -17,6 +17,10 @@ export const organizations = pgTable("organizations", {
   name: text("name").notNull(),
   slug: text("slug").unique().notNull(),
   shopName: text("shop_name"),
+  // Domaine de la boutique e-commerce (ex: "maboutique.myshopify.com" ou
+  // "www.maboutique.com") utilisé pour router les webhooks Shopify/WooCommerce
+  // vers la bonne organisation.
+  storeDomain: text("store_domain").unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

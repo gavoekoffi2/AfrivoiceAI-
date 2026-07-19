@@ -13,7 +13,11 @@ export const PLATFORM_ADMIN_PERMISSIONS = [
 
 export type PlatformAdminPermission = (typeof PLATFORM_ADMIN_PERMISSIONS)[number];
 
-export const SUPER_ADMIN_EMAIL = "c1domefa@gmail.com";
+// Configurable via SUPER_ADMIN_EMAIL ; le fallback conserve le compte
+// fondateur existant pour ne pas casser les déploiements actuels.
+export const SUPER_ADMIN_EMAIL = (
+  process.env.SUPER_ADMIN_EMAIL ?? "c1domefa@gmail.com"
+).toLowerCase();
 
 export function isSuperAdmin(session: Pick<UserSession, "email" | "role"> | null | undefined) {
   return Boolean(
@@ -42,7 +46,7 @@ export function hasAdminPermission(
 export async function requirePlatformAdmin(permission?: PlatformAdminPermission) {
   const session = await getUserSession();
   if (!session) redirect("/login");
-  if (!isPlatformAdmin(session)) redirect("/");
+  if (!isPlatformAdmin(session)) redirect("/dashboard");
   if (permission && !hasAdminPermission(session, permission)) redirect("/admin");
   return session;
 }

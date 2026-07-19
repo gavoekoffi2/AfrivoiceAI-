@@ -10,23 +10,13 @@ export type OrganizationStats = {
   activeCampaigns: number;
 };
 
-const DEMO_STATS: OrganizationStats = {
-  totalCalls: 128,
-  confirmedOrders: 47,
-  confirmationRate: 64,
-  walletBalance: 75000,
-  activeCampaigns: 3,
+const EMPTY_STATS: OrganizationStats = {
+  totalCalls: 0,
+  confirmedOrders: 0,
+  confirmationRate: 0,
+  walletBalance: 0,
+  activeCampaigns: 0,
 };
-
-const DEMO_CHART = [
-  { date: "Lun", total: 9, completed: 6 },
-  { date: "Mar", total: 14, completed: 9 },
-  { date: "Mer", total: 18, completed: 12 },
-  { date: "Jeu", total: 22, completed: 15 },
-  { date: "Ven", total: 31, completed: 21 },
-  { date: "Sam", total: 17, completed: 11 },
-  { date: "Dim", total: 24, completed: 16 },
-];
 
 export async function getOrganizationStats(
   organizationId: string
@@ -98,8 +88,8 @@ export async function getOrganizationStats(
       activeCampaigns,
     };
   } catch (error) {
-    console.warn("[demo] Statistiques DB indisponibles, fallback démo:", error);
-    return DEMO_STATS;
+    console.error("[queries] Statistiques indisponibles:", error);
+    return EMPTY_STATS;
   }
 }
 
@@ -115,14 +105,14 @@ export async function getRecentCalls(
       .orderBy(desc(calls.createdAt))
       .limit(limit);
   } catch (error) {
-    console.warn("[demo] Appels récents DB indisponibles, fallback démo:", error);
+    console.error("[queries] Appels récents indisponibles:", error);
     return [];
   }
 }
 
 export async function getCallsChartData(organizationId: string) {
   try {
-    const result = await db
+    return await db
       .select({
         date: sql<string>`DATE(${calls.createdAt})`,
         total: count(),
@@ -137,56 +127,48 @@ export async function getCallsChartData(organizationId: string) {
       )
       .groupBy(sql`DATE(${calls.createdAt})`)
       .orderBy(sql`DATE(${calls.createdAt})`);
-
-    return result.length ? result : DEMO_CHART;
   } catch (error) {
-    console.warn("[demo] Graphique appels DB indisponible, fallback démo:", error);
-    return DEMO_CHART;
+    console.error("[queries] Graphique appels indisponible:", error);
+    return [];
   }
 }
 
 export async function getWalletWithTransactions(organizationId: string) {
-  try {
-    const wallet = await db
-      .select()
-      .from(wallets)
-      .where(eq(wallets.organizationId, organizationId))
-      .limit(1);
+  const wallet = await db
+    .select()
+    .from(wallets)
+    .where(eq(wallets.organizationId, organizationId))
+    .limit(1);
 
-    if (!wallet[0]) {
-      return {
-        wallet: {
-          id: "demo-wallet",
-          organizationId,
-          balanceFcfa: "75000",
-          currency: "XOF",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        transactions: [],
-      };
-    }
+  if (!wallet[0]) {
+    // Filet de sécurité : une organisation créée avant l'ajout du wallet
+    // automatique n'en possède pas encore. On le crée à la volée.
+    const [createdWallet] = await db
+      .insert(wallets)
+      .values({ organizationId, balanceFcfa: "0" })
+      .onConflictDoNothing()
+      .returning();
 
-    const txHistory = await db
-      .select()
-      .from(transactions)
-      .where(eq(transactions.walletId, wallet[0].id))
-      .orderBy(desc(transactions.createdAt))
-      .limit(20);
-
-    return { wallet: wallet[0], transactions: txHistory };
-  } catch (error) {
-    console.warn("[demo] Wallet DB indisponible, fallback démo:", error);
     return {
-      wallet: {
-        id: "demo-wallet",
-        organizationId,
-        balanceFcfa: "75000",
-        currency: "XOF",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
+      wallet:
+        createdWallet ??
+        (
+          await db
+            .select()
+            .from(wallets)
+            .where(eq(wallets.organizationId, organizationId))
+            .limit(1)
+        )[0],
       transactions: [],
     };
   }
+
+  const txHistory = await db
+    .select()
+    .from(transactions)
+    .where(eq(transactions.walletId, wallet[0].id))
+    .orderBy(desc(transactions.createdAt))
+    .limit(20);
+
+  return { wallet: wallet[0], transactions: txHistory };
 }

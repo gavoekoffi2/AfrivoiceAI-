@@ -4,10 +4,12 @@ import { db } from "@/lib/db";
 import { organizations } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import * as z from "zod";
+import { normalizeStoreDomain } from "@/lib/store-domain";
 
 const updateSettingsSchema = z.object({
   shopName: z.string().min(1).max(100).optional(),
   name: z.string().min(2).max(100).optional(),
+  storeDomain: z.string().max(255).optional(),
 });
 
 export async function GET() {
@@ -54,14 +56,42 @@ export async function PATCH(req: Request) {
       );
     }
 
+    const { storeDomain, ...rest } = validated.data;
+    const updatePayload: Record<string, unknown> = { ...rest };
+
+    if (storeDomain !== undefined) {
+      if (storeDomain.trim() === "") {
+        updatePayload.storeDomain = null;
+      } else {
+        const normalized = normalizeStoreDomain(storeDomain);
+        if (!normalized) {
+          return NextResponse.json(
+            { error: "Domaine de boutique invalide" },
+            { status: 400 }
+          );
+        }
+        updatePayload.storeDomain = normalized;
+      }
+    }
+
     const updated = await db
       .update(organizations)
-      .set(validated.data)
+      .set(updatePayload)
       .where(eq(organizations.id, session.organizationId))
       .returning();
 
     return NextResponse.json({ organization: updated[0] });
   } catch (error) {
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      (error as { code?: string }).code === "23505"
+    ) {
+      return NextResponse.json(
+        { error: "Ce domaine de boutique est déjà utilisé par un autre compte." },
+        { status: 409 }
+      );
+    }
     console.error("[settings] PATCH Erreur:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }

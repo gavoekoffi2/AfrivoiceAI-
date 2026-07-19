@@ -24,7 +24,7 @@ import { logoutAction } from "@/app/actions/auth";
 const mainNavItems = [
   {
     title: "Vue d'ensemble",
-    href: "/",
+    href: "/dashboard",
     icon: LayoutDashboard,
     exact: true,
   },
@@ -122,10 +122,10 @@ export function Sidebar({ organizationName, userEmail, userRole }: SidebarProps)
         </p>
         <div className="space-y-2 rounded-3xl border border-white/10 bg-white/[0.035] p-2">
           <Link
-            href="/"
+            href="/dashboard"
             className={cn(
               "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition-all",
-              pathname !== "/e-commerce"
+              !pathname.startsWith("/e-commerce")
                 ? "bg-gradient-to-r from-emerald-300 to-violet-100 text-slate-950 font-semibold"
                 : "text-white/75 hover:bg-white/10 hover:text-white"
             )}

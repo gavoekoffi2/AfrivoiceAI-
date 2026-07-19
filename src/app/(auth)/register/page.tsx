@@ -3,18 +3,12 @@
 import { useTransition, type FormEvent } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { PhoneCall } from "lucide-react";
+import { Loader2, Rocket } from "lucide-react";
 import { registerAction } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { AuthShell } from "@/components/shared/auth-shell";
 
 export default function RegisterPage() {
   const [isPending, startTransition] = useTransition();
@@ -34,84 +28,93 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
-      <div className="w-full max-w-md space-y-6">
-        {/* Logo */}
-        <div className="flex flex-col items-center space-y-2 text-center">
-          <div className="flex items-center justify-center rounded-full bg-primary/10 p-3">
-            <PhoneCall className="h-8 w-8 text-primary" />
-          </div>
-          <h1 className="text-3xl font-bold text-white">AfrivoxAI</h1>
-          <p className="text-slate-400">Commencez à automatiser vos appels dès aujourd&apos;hui</p>
-        </div>
-
-        <Card className="border-slate-700 bg-slate-800/50 backdrop-blur">
-          <CardHeader>
-            <CardTitle className="text-white">Créer un compte</CardTitle>
-            <CardDescription className="text-slate-400">
-              Inscrivez votre entreprise sur AfrivoxAI
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="organizationName" className="text-slate-300">
-                  Nom de l&apos;entreprise
-                </Label>
-                <Input
-                  id="organizationName"
-                  name="organizationName"
-                  type="text"
-                  placeholder="Mon E-commerce Lomé"
-                  required
-                  className="border-slate-600 bg-slate-700 text-white placeholder:text-slate-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-slate-300">
-                  Adresse email
-                </Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="vous@exemple.com"
-                  required
-                  className="border-slate-600 bg-slate-700 text-white placeholder:text-slate-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-slate-300">
-                  Mot de passe
-                </Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  placeholder="Au moins 8 caractères"
-                  required
-                  minLength={8}
-                  className="border-slate-600 bg-slate-700 text-white placeholder:text-slate-500"
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isPending}
-              >
-                {isPending ? "Création en cours..." : "Créer mon compte"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <p className="text-center text-sm text-slate-400">
+    <AuthShell
+      badge={
+        <>
+          <Rocket className="h-4 w-4" />
+          Démarrez en 2 minutes
+        </>
+      }
+      title="Créer un compte"
+      subtitle="Inscrivez votre entreprise et lancez vos premiers appels IA dès aujourd'hui."
+      footer={
+        <p className="text-center text-sm text-white/45">
           Déjà un compte ?{" "}
-          <Link href="/login" className="text-primary hover:underline">
+          <Link
+            href="/login"
+            className="font-medium text-violet-200 transition hover:text-white"
+          >
             Se connecter
           </Link>
         </p>
-      </div>
-    </div>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="organizationName" className="text-white/80">
+            Nom de l&apos;entreprise
+          </Label>
+          <Input
+            id="organizationName"
+            name="organizationName"
+            type="text"
+            autoComplete="organization"
+            placeholder="Mon E-commerce Lomé"
+            required
+            className="h-12 rounded-2xl border-white/10 bg-white/[0.06] text-white placeholder:text-white/30 focus-visible:ring-violet-400"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="email" className="text-white/80">
+            Adresse email
+          </Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            placeholder="vous@exemple.com"
+            required
+            className="h-12 rounded-2xl border-white/10 bg-white/[0.06] text-white placeholder:text-white/30 focus-visible:ring-violet-400"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="password" className="text-white/80">
+            Mot de passe
+          </Label>
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete="new-password"
+            placeholder="Au moins 8 caractères"
+            required
+            minLength={8}
+            className="h-12 rounded-2xl border-white/10 bg-white/[0.06] text-white placeholder:text-white/30 focus-visible:ring-violet-400"
+          />
+          <p className="text-xs text-white/40">
+            8 caractères minimum. Utilisez un mot de passe unique.
+          </p>
+        </div>
+        <Button
+          type="submit"
+          disabled={isPending}
+          className="h-12 w-full rounded-2xl bg-[#756dff] text-base text-white shadow-xl shadow-violet-950/40 transition hover:bg-[#8a84ff]"
+        >
+          {isPending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Création en cours...
+            </>
+          ) : (
+            "Créer mon compte"
+          )}
+        </Button>
+        <p className="text-center text-xs leading-5 text-white/35">
+          En créant un compte, vous acceptez d&apos;utiliser AfrivoxAI de manière
+          responsable et conforme aux règles locales de démarchage téléphonique.
+        </p>
+      </form>
+    </AuthShell>
   );
 }

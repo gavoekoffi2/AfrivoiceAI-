@@ -44,6 +44,10 @@ function cleanText(text: unknown) {
 
 export async function POST(request: Request) {
   const configuredSecret = process.env.AFRICAN_TTS_VAPI_SECRET;
+  if (!configuredSecret && process.env.NODE_ENV === "production") {
+    // Jamais d'endpoint TTS ouvert en production : le moteur consomme du CPU.
+    return NextResponse.json({ error: "TTS endpoint not configured" }, { status: 503 });
+  }
   if (configuredSecret && getSecret(request) !== configuredSecret) {
     return NextResponse.json({ error: "Unauthorized TTS request" }, { status: 401 });
   }

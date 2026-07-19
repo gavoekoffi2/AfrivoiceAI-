@@ -11,19 +11,6 @@ import { organizations, users, wallets } from "@/lib/db/schema";
 import { getRegistrationErrorMessage } from "@/lib/auth-errors";
 import { generateSlug } from "@/lib/utils";
 
-function isDemoAuthMode() {
-  return (
-    process.env.AFRIVOXAI_DEMO_AUTH === "true" ||
-    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    !process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    !process.env.DATABASE_URL ||
-    process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder") ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.includes("placeholder") ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY.includes("placeholder")
-  );
-}
-
 export async function registerAction(formData: FormData) {
   const rawData = {
     email: formData.get("email") as string,
@@ -36,10 +23,6 @@ export async function registerAction(formData: FormData) {
     return {
       error: validated.error.errors[0].message,
     };
-  }
-
-  if (isDemoAuthMode()) {
-    redirect("/calls");
   }
 
   const serviceSupabase = createSupabaseServiceClient();
@@ -111,7 +94,7 @@ export async function registerAction(formData: FormData) {
     };
   }
 
-  redirect("/calls");
+  redirect("/dashboard");
 }
 
 export async function loginAction(formData: FormData) {
@@ -125,10 +108,6 @@ export async function loginAction(formData: FormData) {
     return { error: validated.error.errors[0].message };
   }
 
-  if (isDemoAuthMode()) {
-    redirect("/calls");
-  }
-
   const supabase = createSupabaseServerClient();
 
   const { error } = await supabase.auth.signInWithPassword({
@@ -140,7 +119,15 @@ export async function loginAction(formData: FormData) {
     return { error: "Email ou mot de passe incorrect." };
   }
 
-  redirect("/calls");
+  const redirectTo = formData.get("redirect");
+  const safeRedirect =
+    typeof redirectTo === "string" &&
+    redirectTo.startsWith("/") &&
+    !redirectTo.startsWith("//")
+      ? redirectTo
+      : "/dashboard";
+
+  redirect(safeRedirect);
 }
 
 export async function logoutAction() {

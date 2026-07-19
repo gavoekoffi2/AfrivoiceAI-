@@ -1,13 +1,10 @@
-import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { orders, calls, wallets, campaigns, leads, organizations } from "@/lib/db/schema";
+import { orders, calls, wallets, campaigns, leads } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import {
   getVapiClient,
-  generateEcommercePrompt,
   generateProspectingPrompt,
-  getFrenchElevenLabsVoice,
   getAgentVoice,
   getFirstMessageForLanguage,
   getVapiWebhookServer,
@@ -17,6 +14,11 @@ import { getUserSession } from "@/lib/auth";
 import { normalizePhoneNumber } from "@/lib/utils";
 import type { Vapi } from "@vapi-ai/server-sdk";
 import { buildProspectingFirstMessage } from "@/lib/prospecting";
+import {
+  startEcommerceConfirmationCall,
+  summarizeCallStartError,
+  createLocalFailedCallId,
+} from "@/lib/calls/initiate-ecommerce";
 
 type AgentVoiceLanguage = "fr" | "ewe";
 
@@ -37,58 +39,11 @@ function getCreatedCallId(callResponse: Vapi.CallsCreateResponse): string {
   return firstCreatedCall.id;
 }
 
-function summarizeCallStartError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message.slice(0, 600);
-  }
-
-  if (typeof error === "string") {
-    return error.slice(0, 600);
-  }
-
-  try {
-    return JSON.stringify(error).slice(0, 600);
-  } catch {
-    return "Erreur inconnue au lancement de l'appel";
-  }
-}
-
-function createLocalFailedCallId(): string {
-  return `local_failed_${randomUUID()}`;
-}
-
 export async function POST(req: Request) {
   try {
-    // Vérifier l'authentification (via session OU appel interne)
-    const internalSecret = req.headers.get("x-internal-secret");
-    const isInternalCall =
-      internalSecret === process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (isInternalCall) {
-      // Appel depuis le webhook Shopify — récupérer l'org depuis la commande
-      const body = await req.json();
-      const { orderId } = body;
-
-      const orderResult = await db
-        .select()
-        .from(orders)
-        .where(eq(orders.id, orderId))
-        .limit(1);
-
-      if (!orderResult[0]) {
-        return NextResponse.json(
-          { error: "Commande introuvable" },
-          { status: 404 }
-        );
-      }
-
-      return await initiateEcommerceCall(
-        orderResult[0],
-        orderResult[0].organizationId
-      );
-    }
-
-    // Appel authentifié depuis le dashboard
+    // Appel authentifié depuis le dashboard uniquement.
+    // Les webhooks e-commerce lancent leurs appels directement via
+    // startEcommerceConfirmationCall (pas d'appel HTTP interne).
     const session = await getUserSession();
     if (!session) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
@@ -115,7 +70,23 @@ export async function POST(req: Request) {
         );
       }
 
-      return await initiateEcommerceCall(orderResult[0], session.organizationId);
+      const result = await startEcommerceConfirmationCall(
+        orderResult[0],
+        session.organizationId
+      );
+
+      if (!result.ok) {
+        return NextResponse.json(
+          { error: result.error, details: result.details },
+          { status: result.status }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        callId: result.vapiCallId,
+        vapiCallId: result.vapiCallId,
+      });
     }
 
     if (body.leadId && body.campaignId) {
@@ -136,135 +107,6 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("[calls/initiate] Erreur:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
-  }
-}
-
-async function initiateEcommerceCall(
-  order: typeof orders.$inferSelect,
-  organizationId: string
-) {
-  // 1. Vérifier le solde du wallet
-  const walletResult = await db
-    .select()
-    .from(wallets)
-    .where(eq(wallets.organizationId, organizationId))
-    .limit(1);
-
-  const wallet = walletResult[0];
-  if (!wallet || !hasSufficientBalance(wallet.balanceFcfa)) {
-    return NextResponse.json(
-      { error: "Solde insuffisant. Rechargez votre wallet." },
-      { status: 402 }
-    );
-  }
-
-  // 2. Récupérer le nom de la boutique
-  const orgResult = await db
-    .select({ shopName: organizations.shopName, name: organizations.name })
-    .from(organizations)
-    .where(eq(organizations.id, organizationId))
-    .limit(1);
-
-  const shopName =
-    orgResult[0]?.shopName ?? orgResult[0]?.name ?? "Notre Boutique";
-
-  // 3. Générer le prompt système
-  const systemPrompt = generateEcommercePrompt({
-    customerName: order.customerName,
-    shopName,
-    orderAmount: order.totalAmount ?? "N/A",
-    currency: order.currency,
-    address: order.customerAddress ?? "adresse non précisée",
-    orderId: order.externalId,
-  });
-
-  try {
-    const vapi = getVapiClient();
-
-    // 4. Lancer l'appel via Vapi
-    const callResponse = await vapi.calls.create({
-      phoneNumberId: process.env.VAPI_PHONE_NUMBER_ID!,
-      customer: {
-        number: order.customerPhone,
-        name: order.customerName,
-      },
-      assistant: {
-        server: getVapiWebhookServer(),
-        model: {
-          provider: "google",
-          model: "gemini-1.5-flash",
-          messages: [{ role: "system", content: systemPrompt }],
-          tools: [{ type: "endCall" }],
-          maxTokens: 250,
-          temperature: 0.7,
-        },
-        voice: getFrenchElevenLabsVoice(),
-        firstMessage: `Bonjour ${order.customerName}, c'est Amina de la boutique ${shopName}. Je vous appelle pour confirmer votre commande. Avez-vous quelques instants ?`,
-        endCallMessage: "Merci beaucoup. Je vous souhaite une excellente journée.",
-        artifactPlan: { recordingEnabled: true },
-        transcriber: {
-          provider: "deepgram",
-          model: "nova-2",
-          language: "fr",
-        },
-      },
-    });
-    const vapiCallId = getCreatedCallId(callResponse);
-
-    // 5. Enregistrer l'appel + mettre à jour le statut de la commande
-    await db.transaction(async (tx) => {
-      await tx.insert(calls).values({
-        organizationId,
-        vapiCallId,
-        orderId: order.id,
-        type: "ecommerce_confirmation",
-        status: "queued",
-      });
-
-      await tx
-        .update(orders)
-        .set({ status: "calling" })
-        .where(eq(orders.id, order.id));
-    });
-
-    console.log(
-      `[calls/initiate] Appel e-commerce lancé: ${vapiCallId} pour commande ${order.id}`
-    );
-
-    return NextResponse.json({
-      success: true,
-      callId: vapiCallId,
-      vapiCallId,
-    });
-  } catch (vapiError) {
-    console.error("[calls/initiate] Erreur Vapi:", vapiError);
-    const errorSummary = summarizeCallStartError(vapiError);
-
-    await db.transaction(async (tx) => {
-      await tx.insert(calls).values({
-        organizationId,
-        vapiCallId: createLocalFailedCallId(),
-        orderId: order.id,
-        type: "ecommerce_confirmation",
-        status: "failed",
-        summary: `Échec lancement Vapi : ${errorSummary}`,
-        endedReason: "vapi_create_failed",
-      });
-
-      await tx
-        .update(orders)
-        .set({ status: "pending" })
-        .where(eq(orders.id, order.id));
-    });
-
-    return NextResponse.json(
-      {
-        error: "Impossible de lancer l'appel via Vapi",
-        details:
-          "L'échec a été enregistré dans l'historique des appels avec le statut failed.",
-      },
-      { status: 503 }
-    );
   }
 }
 

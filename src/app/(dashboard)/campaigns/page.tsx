@@ -71,7 +71,7 @@ export default async function CampaignsPage() {
           .limit(4)
       : [];
   } catch (error) {
-    console.warn("[demo] Données campagnes indisponibles, affichage démo vide:", error);
+    console.error("[campaigns] Données campagnes indisponibles:", error);
   }
 
   return (

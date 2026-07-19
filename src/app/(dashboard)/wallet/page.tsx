@@ -11,6 +11,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Wallet, ArrowUpCircle, ArrowDownCircle, Plus } from "lucide-react";
 import { formatFcfa } from "@/lib/utils";
+import {
+  calculateClientCostFcfa,
+  getExchangeRateInfo,
+} from "@/lib/utils/billing";
 import { WalletDepositButton } from "@/components/shared/wallet-deposit-button";
 import type { Transaction } from "@/lib/db/schema";
 
@@ -22,8 +26,11 @@ export default async function WalletPage() {
 
   const data = await getWalletWithTransactions(session.organizationId);
 
-  const balance = parseFloat(data?.wallet.balanceFcfa ?? "0");
+  const balance = parseFloat(data?.wallet?.balanceFcfa ?? "0");
   const txList: Transaction[] = data?.transactions ?? [];
+  const rateInfo = getExchangeRateInfo();
+  const costPerMinute = calculateClientCostFcfa(0.02);
+  const costPerThreeMinutes = calculateClientCostFcfa(0.06);
 
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
@@ -49,7 +56,8 @@ export default async function WalletPage() {
               {formatFcfa(balance)}
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              ≈ {(balance / 600).toFixed(2)} USD (taux : 1 USD = 600 FCFA)
+              ≈ {(balance / rateInfo.rateUsdToFcfa).toFixed(2)} USD (taux : 1
+              USD = {rateInfo.rateUsdToFcfa} FCFA)
             </p>
             <div className="mt-4">
               <WalletDepositButton />
@@ -62,29 +70,35 @@ export default async function WalletPage() {
           <CardHeader>
             <CardTitle>Tarification</CardTitle>
             <CardDescription>
-              Coût des appels IA (marge 30% incluse)
+              Coût des appels IA (marge {rateInfo.marginPercentage}% incluse)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Taux de change</span>
-              <span className="font-medium">1 USD = 600 FCFA</span>
+              <span className="font-medium">
+                1 USD = {rateInfo.rateUsdToFcfa} FCFA
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Marge appliquée</span>
-              <span className="font-medium">+30%</span>
+              <span className="font-medium">+{rateInfo.marginPercentage}%</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">
                 Coût estimé / appel (1 min)
               </span>
-              <span className="font-medium">~52 FCFA</span>
+              <span className="font-medium">
+                ~{costPerMinute.toLocaleString("fr-TG")} FCFA
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">
                 Coût estimé / appel (3 min)
               </span>
-              <span className="font-medium">~156 FCFA</span>
+              <span className="font-medium">
+                ~{costPerThreeMinutes.toLocaleString("fr-TG")} FCFA
+              </span>
             </div>
           </CardContent>
         </Card>

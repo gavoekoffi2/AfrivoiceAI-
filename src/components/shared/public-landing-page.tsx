@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   ArrowRight,
   Bot,
@@ -205,11 +212,14 @@ export function PublicLandingPage() {
             <div className="overflow-hidden rounded-[32px] border border-white/10 bg-black/30">
               <div className="relative h-80 md:h-[360px]">
                 {imageScenes.map((scene, index) => (
-                  <img
+                  <Image
                     key={scene.title}
                     src={scene.src}
                     alt={scene.title}
-                    className={`absolute inset-0 h-full w-full object-cover transition duration-1000 ${activeScene === index ? "scale-100 opacity-85" : "scale-110 opacity-0"}`}
+                    fill
+                    priority={index === 0}
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                    className={`object-cover transition duration-1000 ${activeScene === index ? "scale-100 opacity-85" : "scale-110 opacity-0"}`}
                   />
                 ))}
                 <div className="absolute inset-0 bg-gradient-to-t from-[#08090a] via-[#08090a]/35 to-transparent" />
@@ -312,6 +322,7 @@ export function PublicLandingPage() {
 
       <section id="parcours" className="relative z-10 mx-auto max-w-7xl px-4 py-14 md:px-6 lg:px-8">
         <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+          <Reveal>
           <div className="relative overflow-hidden rounded-[40px] border border-white/10 bg-white/[0.035] p-6 shadow-2xl shadow-black/30 md:p-8">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_22%_18%,rgba(110,231,183,.16),transparent_28%),radial-gradient(circle_at_88%_62%,rgba(167,139,250,.18),transparent_30%)]" />
             <div className="relative">
@@ -325,14 +336,16 @@ export function PublicLandingPage() {
               <MotionMap />
             </div>
           </div>
+          </Reveal>
 
           <div className="grid gap-4">
             {[
               { icon: MousePointer2, title: "Navigation fluide", text: "La plateforme est simple, rapide et agréable à découvrir." },
               { icon: PhoneCall, title: "Appel IA", text: "Le prospect comprend immédiatement qu’un agent vocal peut gérer l’appel." },
               { icon: UsersRound, title: "Contact qualifié", text: "L’équipe reçoit un résumé clair pour décider de la suite." },
-            ].map((item) => (
-              <div key={item.title} className="group rounded-[34px] border border-white/10 bg-[#0d0e12]/90 p-6 transition duration-300 hover:-translate-y-1 hover:border-emerald-200/30 hover:bg-[#12141b]">
+            ].map((item, index) => (
+              <Reveal key={item.title} delay={index * 130}>
+              <div className="group rounded-[34px] border border-white/10 bg-[#0d0e12]/90 p-6 transition duration-300 hover:-translate-y-1 hover:border-emerald-200/30 hover:bg-[#12141b]">
                 <div className="mb-5 flex items-center justify-between">
                   <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/[0.06] text-emerald-100 transition duration-300 group-hover:rotate-3 group-hover:scale-110 group-hover:bg-emerald-300/15">
                     <item.icon className="h-5 w-5" />
@@ -342,6 +355,7 @@ export function PublicLandingPage() {
                 <h3 className="text-xl font-semibold tracking-[-0.03em]">{item.title}</h3>
                 <p className="mt-3 text-sm leading-6 text-white/55">{item.text}</p>
               </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -349,8 +363,15 @@ export function PublicLandingPage() {
 
       <section id="solutions" className="relative z-10 mx-auto max-w-7xl px-4 py-14 md:px-6 lg:px-8">
         <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
-          <div className="relative overflow-hidden rounded-[34px] border border-white/10 bg-white/[0.035] p-6 md:p-8">
-            <img src="/landing/african-collaboration.jpg" alt="Professionnels africains en collaboration" className="absolute inset-0 h-full w-full object-cover opacity-30" />
+          <Reveal>
+          <div className="relative h-full overflow-hidden rounded-[34px] border border-white/10 bg-white/[0.035] p-6 md:p-8">
+            <Image
+              src="/landing/african-collaboration.jpg"
+              alt="Professionnels africains en collaboration"
+              fill
+              sizes="(max-width: 1024px) 100vw, 40vw"
+              className="object-cover opacity-30"
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-[#090a0f] via-[#090a0f]/80 to-[#090a0f]/50" />
             <div className="relative">
               <p className="text-sm uppercase tracking-[0.22em] text-emerald-100/70">solutions</p>
@@ -360,14 +381,16 @@ export function PublicLandingPage() {
               </p>
             </div>
           </div>
+          </Reveal>
           <div className="grid gap-4 sm:grid-cols-2">
             {[
               { icon: Store, title: "E-commerce", text: "Confirmer les commandes, vérifier les adresses, rassurer les clients." },
               { icon: MessageCircle, title: "Prospection B2B", text: "Appeler les bases prospects par pays et détecter les clients chauds." },
               { icon: PhoneCall, title: "Appels entrants", text: "Répondre quand l’équipe est occupée et capturer chaque demande." },
               { icon: ShieldCheck, title: "Suivi premium", text: "Rapports, scripts, scoring et historique pour piloter les ventes." },
-            ].map((item) => (
-              <div key={item.title} className="group rounded-[34px] border border-white/10 bg-[#0d0e12] p-6 transition hover:-translate-y-1 hover:border-white/20 hover:bg-[#12131a]">
+            ].map((item, index) => (
+              <Reveal key={item.title} delay={index * 110} className="h-full">
+              <div className="group h-full rounded-[34px] border border-white/10 bg-[#0d0e12] p-6 transition hover:-translate-y-1 hover:border-white/20 hover:bg-[#12131a]">
                 <div className="mb-8 flex items-center justify-between">
                   <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white/[0.06] text-violet-100 transition group-hover:rotate-3 group-hover:scale-110">
                     <item.icon className="h-5 w-5" />
@@ -377,12 +400,14 @@ export function PublicLandingPage() {
                 <h3 className="text-xl font-semibold tracking-[-0.03em]">{item.title}</h3>
                 <p className="mt-3 text-sm leading-6 text-white/55">{item.text}</p>
               </div>
+              </Reveal>
             ))}
           </div>
         </div>
       </section>
 
       <section id="packs" className="relative z-10 mx-auto max-w-7xl px-4 pb-16 pt-10 md:px-6 lg:px-8">
+        <Reveal>
         <div className="overflow-hidden rounded-[40px] border border-white/10 bg-white/[0.035] p-6 shadow-2xl shadow-black/30 md:p-8">
           <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
             <div>
@@ -401,6 +426,41 @@ export function PublicLandingPage() {
             ))}
           </div>
         </div>
+        </Reveal>
+      </section>
+
+      <section className="relative z-10 mx-auto max-w-7xl px-4 pb-20 md:px-6 lg:px-8">
+        <Reveal>
+        <div className="relative overflow-hidden rounded-[44px] border border-violet-300/25 bg-gradient-to-br from-violet-600/25 via-[#0b0c12] to-emerald-500/15 p-8 text-center shadow-2xl shadow-violet-950/40 md:p-14">
+          <div className="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-violet-500/25 blur-[90px]" />
+          <div className="pointer-events-none absolute -bottom-24 -right-16 h-64 w-64 rounded-full bg-emerald-400/15 blur-[90px]" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+          <div className="relative mx-auto max-w-3xl space-y-6">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-4 py-1.5 text-sm text-white/80 backdrop-blur">
+              <Sparkles className="h-4 w-4 text-violet-200 animate-[spark_2.8s_ease-in-out_infinite]" />
+              Prêt pour vos premiers appels IA
+            </span>
+            <h2 className="text-4xl font-semibold leading-[1.02] tracking-[-0.055em] md:text-6xl">
+              Votre force commerciale IA démarre aujourd&apos;hui.
+            </h2>
+            <p className="mx-auto max-w-xl text-lg leading-8 text-white/60">
+              Créez votre compte, choisissez vos prospects et laissez l&apos;agent vocal
+              AfrivoxAI transformer chaque conversation en opportunité.
+            </p>
+            <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Button asChild size="lg" className="group h-14 rounded-full bg-white px-8 text-base text-black shadow-2xl shadow-black/30 hover:bg-white/90">
+                <Link href="/register">
+                  Créer un compte gratuitement
+                  <ArrowRight className="ml-2 h-4 w-4 transition group-hover:translate-x-1" />
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline" className="h-14 rounded-full border-white/15 bg-white/[0.04] px-8 text-base text-white hover:bg-white/10 hover:text-white">
+                <Link href="/login">Se connecter</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+        </Reveal>
       </section>
 
       <footer className="relative z-10 mx-auto flex max-w-7xl flex-col gap-4 border-t border-white/10 px-4 py-8 text-sm text-white/45 md:flex-row md:items-center md:justify-between md:px-6 lg:px-8">
@@ -472,6 +532,56 @@ export function PublicLandingPage() {
         }
       `}</style>
     </main>
+  );
+}
+
+function Reveal({
+  children,
+  delay = 0,
+  className = "",
+}: {
+  children: ReactNode;
+  delay?: number;
+  className?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+
+    if (typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setVisible(true);
+            observer.disconnect();
+          }
+        }
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -40px 0px" }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      style={{ transitionDelay: `${delay}ms` }}
+      className={`transition-all duration-700 ease-out will-change-transform ${
+        visible ? "translate-y-0 opacity-100" : "translate-y-10 opacity-0"
+      } ${className}`}
+    >
+      {children}
+    </div>
   );
 }
 

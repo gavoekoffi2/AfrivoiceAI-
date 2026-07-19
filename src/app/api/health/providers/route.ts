@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { getUserSession } from "@/lib/auth";
+import { isPlatformAdmin } from "@/lib/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -85,6 +87,13 @@ async function checkVapi(): Promise<{
 }
 
 export async function GET() {
+  // Diagnostic détaillé de la configuration : réservé aux admins plateforme.
+  // (/api/health reste public pour les sondes de disponibilité.)
+  const session = await getUserSession();
+  if (!isPlatformAdmin(session)) {
+    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  }
+
   const vapi = await checkVapi();
   const supabase = {
     urlConfigured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),

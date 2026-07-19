@@ -4,7 +4,13 @@ import { db } from "@/lib/db";
 import { campaigns, leads, calls, wallets } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { hasSufficientBalance } from "@/lib/utils/billing";
-import { getFrenchElevenLabsVoice, getVapiClient, generateProspectingPrompt } from "@/lib/vapi/client";
+import {
+  getAgentVoice,
+  getFirstMessageForLanguage,
+  getVapiClient,
+  getVapiWebhookServer,
+  generateProspectingPrompt,
+} from "@/lib/vapi/client";
 import { normalizePhoneNumber } from "@/lib/utils";
 import type { Vapi } from "@vapi-ai/server-sdk";
 import { buildProspectingFirstMessage } from "@/lib/prospecting";
@@ -139,11 +145,13 @@ export async function POST(
         }
 
         const phone = normalizePhoneNumber(lead.phone, "TG") ?? lead.phone;
+        const voiceLanguage = campaign.voiceLanguage === "ewe" ? "ewe" : "fr";
         const systemPrompt = generateProspectingPrompt({
           objective: campaign.objective,
           scriptTemplate: campaign.scriptTemplate,
           leadName: lead.name ?? undefined,
           companyName: lead.company ?? undefined,
+          voiceLanguage,
         });
 
         const callResponse = await vapi.calls.create({
@@ -153,6 +161,7 @@ export async function POST(
             name: lead.name ?? undefined,
           },
           assistant: {
+            server: getVapiWebhookServer(),
             model: {
               provider: "google",
               model: "gemini-1.5-flash",
@@ -161,12 +170,18 @@ export async function POST(
               maxTokens: 300,
               temperature: 0.7,
             },
-            voice: getFrenchElevenLabsVoice(),
-            firstMessage: buildProspectingFirstMessage({
-              leadName: lead.name,
-              companyName: lead.company,
-            }),
-            endCallMessage: "Merci pour votre temps. Je vous souhaite une excellente journée.",
+            voice: getAgentVoice(voiceLanguage),
+            firstMessage: getFirstMessageForLanguage(
+              voiceLanguage,
+              buildProspectingFirstMessage({
+                leadName: lead.name,
+                companyName: lead.company,
+              })
+            ),
+            endCallMessage:
+              voiceLanguage === "ewe"
+                ? "Akpe na wò. Ne èdi la, míate ŋu ayi edzi le français me."
+                : "Merci pour votre temps. Je vous souhaite une excellente journée.",
             artifactPlan: { recordingEnabled: true },
             transcriber: {
               provider: "deepgram",

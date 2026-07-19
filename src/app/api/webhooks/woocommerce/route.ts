@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { db } from "@/lib/db";
-import { orders, organizations } from "@/lib/db/schema";
+import { orders } from "@/lib/db/schema";
 import { normalizePhoneNumber } from "@/lib/utils";
+import { startEcommerceConfirmationCall } from "@/lib/calls/initiate-ecommerce";
+import { findOrganizationByStoreDomain } from "@/lib/store-domain";
 
 interface WooCommerceOrderPayload {
   id: number;
@@ -34,10 +36,18 @@ function verifyWooCommerceWebhook(
   rawBody: string,
   signature: string | null
 ): boolean {
-  if (!signature) return false;
-
   const secret = process.env.WOOCOMMERCE_WEBHOOK_SECRET;
-  if (!secret) return true; // Pas de secret configuré, accepter en dev
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "[woocommerce] WOOCOMMERCE_WEBHOOK_SECRET manquant : webhook rejeté en production"
+      );
+      return false;
+    }
+    return true; // Pas de secret configuré, accepter en dev
+  }
+
+  if (!signature) return false;
 
   const computedHash = crypto
     .createHmac("sha256", secret)
@@ -45,10 +55,10 @@ function verifyWooCommerceWebhook(
     .digest("base64");
 
   try {
-    return crypto.timingSafeEqual(
-      Buffer.from(computedHash),
-      Buffer.from(signature)
-    );
+    const expected = Buffer.from(computedHash);
+    const received = Buffer.from(signature);
+    if (expected.length !== received.length) return false;
+    return crypto.timingSafeEqual(expected, received);
   } catch {
     return false;
   }
@@ -88,13 +98,17 @@ export async function POST(req: Request) {
       });
     }
 
-    // Chercher l'organisation (en production, associer via le domaine WooCommerce)
-    const orgResult = await db.select().from(organizations).limit(1);
-    const organization = orgResult[0];
+    // Retrouver l'organisation via le domaine de la boutique WooCommerce
+    // (header x-wc-webhook-source envoyé par WooCommerce).
+    const webhookSource = req.headers.get("x-wc-webhook-source");
+    const organization = await findOrganizationByStoreDomain(webhookSource);
 
     if (!organization) {
+      console.error(
+        `[woocommerce/webhook] Aucune organisation pour la source: ${webhookSource}`
+      );
       return NextResponse.json(
-        { error: "Organisation introuvable" },
+        { error: "Boutique non reconnue. Configurez le domaine dans les paramètres AfrivoxAI." },
         { status: 404 }
       );
     }
@@ -154,21 +168,12 @@ export async function POST(req: Request) {
       `[woocommerce/webhook] Commande COD créée: ${insertedOrder[0].id} pour ${customerName}`
     );
 
-    // Déclencher l'appel de confirmation
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-    fetch(`${baseUrl}/api/calls/initiate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-internal-secret": process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
-      },
-      body: JSON.stringify({ orderId: insertedOrder[0].id }),
-    }).catch((err) => {
-      console.error(
-        `[woocommerce/webhook] Erreur déclenchement appel:`,
-        err
-      );
-    });
+    // Déclencher l'appel de confirmation directement (pas d'appel HTTP interne)
+    startEcommerceConfirmationCall(insertedOrder[0], organization.id).catch(
+      (err) => {
+        console.error(`[woocommerce/webhook] Erreur déclenchement appel:`, err);
+      }
+    );
 
     return NextResponse.json({
       received: true,

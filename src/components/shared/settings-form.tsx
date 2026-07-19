@@ -11,15 +11,18 @@ interface SettingsFormProps {
   organizationId: string;
   initialName: string;
   initialShopName: string;
+  initialStoreDomain?: string;
 }
 
 export function SettingsForm({
   organizationId,
   initialName,
   initialShopName,
+  initialStoreDomain = "",
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
   const [shopName, setShopName] = useState(initialShopName);
+  const [storeDomain, setStoreDomain] = useState(initialStoreDomain);
   const [isPending, startTransition] = useTransition();
 
   function handleSave() {
@@ -28,7 +31,7 @@ export function SettingsForm({
         const res = await fetch("/api/settings", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, shopName }),
+          body: JSON.stringify({ name, shopName, storeDomain }),
         });
 
         const data = await res.json();
@@ -70,6 +73,19 @@ export function SettingsForm({
           />
           <p className="text-xs text-muted-foreground">
             Utilisé par l&apos;IA lors des appels de confirmation
+          </p>
+        </div>
+        <div className="space-y-2 md:col-span-2">
+          <Label htmlFor="storeDomain">Domaine de la boutique en ligne</Label>
+          <Input
+            id="storeDomain"
+            value={storeDomain}
+            onChange={(e) => setStoreDomain(e.target.value)}
+            placeholder="maboutique.myshopify.com ou www.maboutique.com"
+          />
+          <p className="text-xs text-muted-foreground">
+            Permet de relier automatiquement les commandes Shopify/WooCommerce
+            de votre boutique à votre compte AfrivoxAI.
           </p>
         </div>
       </div>

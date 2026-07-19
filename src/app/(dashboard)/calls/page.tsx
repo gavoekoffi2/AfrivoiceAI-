@@ -86,10 +86,10 @@ export default async function CallsPage({
     prospectingCount: number;
   }> = [
     {
-      total: 128,
-      completed: 82,
-      ecommerceCount: 57,
-      prospectingCount: 71,
+      total: 0,
+      completed: 0,
+      ecommerceCount: 0,
+      prospectingCount: 0,
     },
   ];
 
@@ -117,7 +117,7 @@ export default async function CallsPage({
         .where(eq(calls.organizationId, session.organizationId)),
     ]);
   } catch (error) {
-    console.warn("[demo] Données appels indisponibles, affichage démo vide:", error);
+    console.error("[calls] Données appels indisponibles:", error);
   }
 
   const totalCount = totalCountResult[0]?.count ?? 0;

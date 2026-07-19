@@ -1,14 +1,23 @@
 import { NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
 import { getUserSession } from "@/lib/auth";
+import { isSuperAdmin } from "@/lib/admin";
 import { db } from "@/lib/db";
 import { leadDatabaseRecords } from "@/lib/db/schema";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
     const session = await getUserSession();
     if (!session) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    // Endpoint de test interne : expose des numéros de la base globale,
+    // donc réservé au super administrateur.
+    if (!isSuperAdmin(session)) {
+      return NextResponse.json({ error: "Accès réservé" }, { status: 403 });
     }
 
     const [countryLead] = await db

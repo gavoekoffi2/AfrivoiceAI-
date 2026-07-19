@@ -104,7 +104,7 @@ export default async function EcommercePage() {
         </p>
         <div className="mt-5 flex flex-wrap gap-2">
           <Button asChild>
-            <Link href="/">Retour espace Entreprises</Link>
+            <Link href="/dashboard">Retour espace Entreprises</Link>
           </Button>
           <Button asChild variant="outline">
             <Link href="/settings">Préparer les intégrations</Link>

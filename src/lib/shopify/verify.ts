@@ -21,10 +21,14 @@ export function verifyShopifyWebhook(
     .digest("base64");
 
   // Comparaison en temps constant pour éviter les timing attacks
-  return crypto.timingSafeEqual(
-    Buffer.from(computedHash),
-    Buffer.from(signature)
-  );
+  try {
+    const expected = Buffer.from(computedHash);
+    const received = Buffer.from(signature);
+    if (expected.length !== received.length) return false;
+    return crypto.timingSafeEqual(expected, received);
+  } catch {
+    return false;
+  }
 }
 
 export function isCashOnDelivery(gateway: string): boolean {

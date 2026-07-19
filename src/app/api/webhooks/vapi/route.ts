@@ -47,26 +47,20 @@ function analyzeCallOutcome(
 ): "confirmed" | "cancelled" | "no_answer" {
   const combined = `${summary} ${transcript}`.toLowerCase();
 
-  const cancelKeywords = [
+  // Les mots courts ("non", "oui", "ok") sont matchés sur des mots entiers
+  // pour éviter les faux positifs par sous-chaîne ("annonce", "brooklyn"...).
+  const containsWord = (word: string) =>
+    new RegExp(`(?:^|[^\\p{L}])${word}(?:[^\\p{L}]|$)`, "u").test(combined);
+
+  const cancelPhrases = [
     "annul",
-    "annulé",
     "pas intéressé",
-    "non",
     "refuse",
     "ne veut pas",
     "n'est pas intéressé",
   ];
-  const confirmKeywords = [
-    "confirme",
-    "confirmé",
-    "oui",
-    "d'accord",
-    "ok",
-    "parfait",
-    "livrer",
-    "disponible",
-  ];
-  const noAnswerKeywords = [
+  const confirmPhrases = ["confirme", "confirmé", "d'accord", "parfait", "livrer", "disponible"];
+  const noAnswerPhrases = [
     "pas de réponse",
     "messagerie",
     "occupé",
@@ -74,9 +68,15 @@ function analyzeCallOutcome(
     "no-answer",
   ];
 
-  if (noAnswerKeywords.some((kw) => combined.includes(kw))) return "no_answer";
-  if (cancelKeywords.some((kw) => combined.includes(kw))) return "cancelled";
-  if (confirmKeywords.some((kw) => combined.includes(kw))) return "confirmed";
+  if (noAnswerPhrases.some((kw) => combined.includes(kw))) return "no_answer";
+  if (cancelPhrases.some((kw) => combined.includes(kw)) || containsWord("non"))
+    return "cancelled";
+  if (
+    confirmPhrases.some((kw) => combined.includes(kw)) ||
+    containsWord("oui") ||
+    containsWord("ok")
+  )
+    return "confirmed";
 
   return "confirmed"; // Par défaut si l'appel s'est terminé normalement
 }

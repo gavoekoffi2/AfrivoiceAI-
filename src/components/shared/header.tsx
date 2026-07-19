@@ -1,6 +1,7 @@
 "use client";
 
-import { Bell, Menu } from "lucide-react";
+import Link from "next/link";
+import { Menu, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatFcfa } from "@/lib/utils";
@@ -22,6 +23,7 @@ export function Header({ title, walletBalance, onMenuToggle }: HeaderProps) {
         size="icon"
         className="md:hidden"
         onClick={onMenuToggle}
+        aria-label="Ouvrir le menu"
       >
         <Menu className="h-5 w-5" />
       </Button>
@@ -31,9 +33,11 @@ export function Header({ title, walletBalance, onMenuToggle }: HeaderProps) {
       <div className="flex items-center gap-3">
         <ThemeModeToggle />
 
-        {/* Solde Wallet */}
-        <div
-          className={`flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium ${
+        {/* Solde Wallet — cliquable vers la page wallet */}
+        <Link
+          href="/wallet"
+          title="Voir le wallet"
+          className={`flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium transition hover:brightness-95 ${
             isLowBalance
               ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
               : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
@@ -46,10 +50,13 @@ export function Header({ title, walletBalance, onMenuToggle }: HeaderProps) {
               Faible
             </Badge>
           )}
-        </div>
+        </Link>
 
-        <Button variant="ghost" size="icon">
-          <Bell className="h-5 w-5" />
+        <Button asChild size="sm" className="hidden gap-1 rounded-full md:flex">
+          <Link href="/campaigns">
+            <Plus className="h-4 w-4" />
+            Lancer un appel
+          </Link>
         </Button>
       </div>
     </header>

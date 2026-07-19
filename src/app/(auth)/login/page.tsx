@@ -1,23 +1,20 @@
 "use client";
 
-import { useTransition, type FormEvent } from "react";
+import { Suspense, useTransition, type FormEvent } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { PhoneCall } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { loginAction } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { AuthShell } from "@/components/shared/auth-shell";
 
-export default function LoginPage() {
+function LoginForm() {
   const [isPending, startTransition] = useTransition();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") ?? "";
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -32,70 +29,88 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
-      <div className="w-full max-w-md space-y-6">
-        {/* Logo */}
-        <div className="flex flex-col items-center space-y-2 text-center">
-          <div className="flex items-center justify-center rounded-full bg-primary/10 p-3">
-            <PhoneCall className="h-8 w-8 text-primary" />
-          </div>
-          <h1 className="text-3xl font-bold text-white">AfrivoxAI</h1>
-          <p className="text-slate-400">La puissance de la Voice AI pour l&apos;Afrique</p>
-        </div>
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {redirectTo && (
+        <input type="hidden" name="redirect" value={redirectTo} />
+      )}
+      <div className="space-y-2">
+        <Label htmlFor="email" className="text-white/80">
+          Adresse email
+        </Label>
+        <Input
+          id="email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          placeholder="vous@exemple.com"
+          required
+          className="h-12 rounded-2xl border-white/10 bg-white/[0.06] text-white placeholder:text-white/30 focus-visible:ring-violet-400"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="password" className="text-white/80">
+          Mot de passe
+        </Label>
+        <Input
+          id="password"
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          placeholder="••••••••"
+          required
+          className="h-12 rounded-2xl border-white/10 bg-white/[0.06] text-white placeholder:text-white/30 focus-visible:ring-violet-400"
+        />
+      </div>
+      <Button
+        type="submit"
+        disabled={isPending}
+        className="h-12 w-full rounded-2xl bg-[#756dff] text-base text-white shadow-xl shadow-violet-950/40 transition hover:bg-[#8a84ff]"
+      >
+        {isPending ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Connexion en cours...
+          </>
+        ) : (
+          "Se connecter"
+        )}
+      </Button>
+    </form>
+  );
+}
 
-        <Card className="border-slate-700 bg-slate-800/50 backdrop-blur">
-          <CardHeader>
-            <CardTitle className="text-white">Connexion</CardTitle>
-            <CardDescription className="text-slate-400">
-              Accédez à votre espace AfrivoxAI
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-slate-300">
-                  Adresse email
-                </Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="vous@exemple.com"
-                  required
-                  className="border-slate-600 bg-slate-700 text-white placeholder:text-slate-500"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-slate-300">
-                  Mot de passe
-                </Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  placeholder="••••••••"
-                  required
-                  className="border-slate-600 bg-slate-700 text-white placeholder:text-slate-500"
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isPending}
-              >
-                {isPending ? "Connexion en cours..." : "Se connecter"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <p className="text-center text-sm text-slate-400">
+export default function LoginPage() {
+  return (
+    <AuthShell
+      badge={
+        <>
+          <Sparkles className="h-4 w-4" />
+          Ravi de vous revoir
+        </>
+      }
+      title="Connexion"
+      subtitle="Accédez à votre espace AfrivoxAI et pilotez vos appels IA."
+      footer={
+        <p className="text-center text-sm text-white/45">
           Pas encore de compte ?{" "}
-          <Link href="/register" className="text-primary hover:underline">
+          <Link
+            href="/register"
+            className="font-medium text-violet-200 transition hover:text-white"
+          >
             Créer un compte
           </Link>
         </p>
-      </div>
-    </div>
+      }
+    >
+      <Suspense
+        fallback={
+          <div className="flex justify-center py-10">
+            <Loader2 className="h-6 w-6 animate-spin text-white/60" />
+          </div>
+        }
+      >
+        <LoginForm />
+      </Suspense>
+    </AuthShell>
   );
 }
