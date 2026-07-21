@@ -49,14 +49,30 @@ export async function POST(request: Request) {
   const scriptPath = path.join(cwd, "scripts", "african_tts", "generate_ewe_demo.py");
 
   if (!existsSync(pythonPath) || !existsSync(scriptPath)) {
-    return NextResponse.json(
-      {
-        error: "Le moteur TTS Éwé local n'est pas installé sur ce serveur.",
-        setup:
-          "uv venv .venv-african-tts && uv pip install --python .venv-african-tts/bin/python 'transformers>=4.38' torch scipy soundfile",
-      },
-      { status: 503 }
-    );
+    const fallbackPath = path.join(cwd, "public", "demos", "ewe-voice-demo.wav");
+
+    if (!existsSync(fallbackPath)) {
+      return NextResponse.json(
+        { error: "La démonstration vocale Éwé est temporairement indisponible." },
+        { status: 503 }
+      );
+    }
+
+    const audio = readFileSync(fallbackPath);
+    return NextResponse.json({
+      ok: true,
+      language: "Éwé / Ewe",
+      provider: "AfrivoxAI — extrait Éwé vérifié",
+      model: "facebook/mms-tts-ewe",
+      license: "cc-by-nc-4.0",
+      commercialUse: false,
+      text: DEFAULT_TEXT,
+      durationHint: "~9s",
+      fallback: true,
+      metadata: { bytes: audio.byteLength },
+      audioMimeType: "audio/wav",
+      audioBase64: audio.toString("base64"),
+    });
   }
 
   const outputDir = path.join(os.tmpdir(), "afrivoxai-ewe-tts");
