@@ -17,6 +17,7 @@ import { getUserSession } from "@/lib/auth";
 import { normalizePhoneNumber } from "@/lib/utils";
 import type { Vapi } from "@vapi-ai/server-sdk";
 import { buildProspectingFirstMessage } from "@/lib/prospecting";
+import { getOutboundPhoneNumberId } from "@/lib/vapi/routing";
 
 type AgentVoiceLanguage = "fr" | "ewe";
 
@@ -180,12 +181,14 @@ async function initiateEcommerceCall(
 
   try {
     const vapi = getVapiClient();
+    const customerPhone =
+      normalizePhoneNumber(order.customerPhone, "TG") ?? order.customerPhone;
 
-    // 4. Lancer l'appel via Vapi
+    // 4. Lancer l'appel via le transport adapté à la destination.
     const callResponse = await vapi.calls.create({
-      phoneNumberId: process.env.VAPI_PHONE_NUMBER_ID!,
+      phoneNumberId: getOutboundPhoneNumberId(customerPhone),
       customer: {
-        number: order.customerPhone,
+        number: customerPhone,
         name: order.customerName,
       },
       assistant: {
@@ -333,7 +336,7 @@ async function initiateProspectingCall(
     const vapi = getVapiClient();
 
     const callResponse = await vapi.calls.create({
-      phoneNumberId: process.env.VAPI_PHONE_NUMBER_ID!,
+      phoneNumberId: getOutboundPhoneNumberId(phone),
       customer: {
         number: phone,
         name: lead.name ?? undefined,
