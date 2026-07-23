@@ -1,13 +1,22 @@
 import { NextResponse } from "next/server";
 import { getUserSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { campaigns, leads, calls, wallets } from "@/lib/db/schema";
+import {
+  campaigns,
+  leads,
+  calls,
+  wallets,
+  phoneLines,
+  organizationBillingProfiles,
+} from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { hasSufficientBalance } from "@/lib/utils/billing";
+import { hasCallAllowance } from "@/lib/utils/billing";
+import { getBillingPlan } from "@/lib/billing/plans";
 import { getFrenchElevenLabsVoice, getVapiClient, generateProspectingPrompt } from "@/lib/vapi/client";
 import { normalizePhoneNumber } from "@/lib/utils";
 import type { Vapi } from "@vapi-ai/server-sdk";
 import { buildProspectingFirstMessage } from "@/lib/prospecting";
+import { resolvePhoneLineVapiId } from "@/lib/vapi/routing";
 import { randomUUID } from "crypto";
 
 const BATCH_DELAY_MS = 2000; // 2 secondes entre chaque appel
@@ -83,19 +92,57 @@ export async function POST(
       );
     }
 
-    // Vérifier le solde
-    const walletResult = await db
-      .select()
-      .from(wallets)
-      .where(eq(wallets.organizationId, session.organizationId))
-      .limit(1);
+    if (!campaign.phoneLineId) {
+      return NextResponse.json(
+        { error: "Choisissez une ligne téléphonique pour cette campagne." },
+        { status: 400 }
+      );
+    }
+
+    const selectedLine = await db.query.phoneLines.findFirst({
+      where: and(
+        eq(phoneLines.id, campaign.phoneLineId),
+        eq(phoneLines.organizationId, session.organizationId),
+        eq(phoneLines.status, "active"),
+        eq(phoneLines.verificationStatus, "verified")
+      ),
+    });
+
+    if (!selectedLine) {
+      return NextResponse.json(
+        { error: "La ligne choisie n’est plus active ou vérifiée." },
+        { status: 400 }
+      );
+    }
+
+    // Vérifier les minutes du forfait, les bonus ou le wallet.
+    const [walletResult, billingProfile] = await Promise.all([
+      db
+        .select()
+        .from(wallets)
+        .where(eq(wallets.organizationId, session.organizationId))
+        .limit(1),
+      db.query.organizationBillingProfiles.findFirst({
+        where: eq(
+          organizationBillingProfiles.organizationId,
+          session.organizationId
+        ),
+      }),
+    ]);
+    const plan = getBillingPlan(billingProfile?.planCode);
 
     if (
       !walletResult[0] ||
-      !hasSufficientBalance(walletResult[0].balanceFcfa)
+      !hasCallAllowance({
+        balanceFcfa: walletResult[0].balanceFcfa,
+        includedMinutesMonthly:
+          billingProfile?.includedMinutesMonthly ?? plan.includedMinutes,
+        usedMinutesThisCycle: billingProfile?.usedMinutesThisCycle ?? "0",
+        bonusMinutesBalance: billingProfile?.bonusMinutesBalance ?? "0",
+      })
     ) {
       return NextResponse.json(
-        { error: "Solde insuffisant pour lancer des appels." },
+        { error: "Minutes épuisées et wallet insuffisant. Ajoutez un pack de minutes." },
         { status: 402 }
       );
     }
@@ -107,6 +154,7 @@ export async function POST(
       .where(
         and(
           eq(leads.campaignId, campaignId),
+          eq(leads.organizationId, session.organizationId),
           eq(leads.status, "new")
         )
       )
@@ -133,7 +181,16 @@ export async function POST(
           .where(eq(wallets.organizationId, session.organizationId))
           .limit(1);
 
-        if (!freshWallet[0] || !hasSufficientBalance(freshWallet[0].balance)) {
+        if (
+          !freshWallet[0] ||
+          !hasCallAllowance({
+            balanceFcfa: freshWallet[0].balance,
+            includedMinutesMonthly:
+              billingProfile?.includedMinutesMonthly ?? plan.includedMinutes,
+            usedMinutesThisCycle: billingProfile?.usedMinutesThisCycle ?? "0",
+            bonusMinutesBalance: billingProfile?.bonusMinutesBalance ?? "0",
+          })
+        ) {
           console.log("[batch/launch] Solde insuffisant, arrêt du batch");
           break;
         }
@@ -147,7 +204,7 @@ export async function POST(
         });
 
         const callResponse = await vapi.calls.create({
-          phoneNumberId: process.env.VAPI_PHONE_NUMBER_ID!,
+          phoneNumberId: resolvePhoneLineVapiId(selectedLine, phone),
           customer: {
             number: phone,
             name: lead.name ?? undefined,
@@ -181,6 +238,7 @@ export async function POST(
         await db.transaction(async (tx) => {
           await tx.insert(calls).values({
             organizationId: session.organizationId,
+            phoneLineId: selectedLine.id,
             vapiCallId,
             leadId: lead.id,
             type: "prospecting",
@@ -210,6 +268,7 @@ export async function POST(
         await db.transaction(async (tx) => {
           await tx.insert(calls).values({
             organizationId: session.organizationId,
+            phoneLineId: selectedLine.id,
             vapiCallId: createLocalFailedCallId(),
             leadId: lead.id,
             type: "prospecting",

@@ -2,7 +2,7 @@
 
 import { createCampaignSchema } from "@/lib/validations/campaign";
 import { db } from "@/lib/db";
-import { campaigns, leads } from "@/lib/db/schema";
+import { campaigns, leads, phoneLines } from "@/lib/db/schema";
 import { getUserSession } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { eq, and, inArray } from "drizzle-orm";
@@ -17,6 +17,7 @@ export async function createCampaignAction(formData: FormData) {
     objective: formData.get("objective") as string,
     scriptTemplate: formData.get("scriptTemplate") as string,
     voiceLanguage: (formData.get("voiceLanguage") as string) || "fr",
+    phoneLineId: cleanOptional(formData.get("phoneLineId")),
   };
 
   const validated = createCampaignSchema.safeParse(rawData);
@@ -28,10 +29,22 @@ export async function createCampaignAction(formData: FormData) {
   }
 
   try {
+    const phoneLineId = await getUsablePhoneLineId(
+      session.organizationId,
+      validated.data.phoneLineId
+    );
+    if (!phoneLineId) {
+      return {
+        error:
+          "Choisissez une ligne téléphonique active et vérifiée avant de créer la campagne.",
+      };
+    }
+
     const result = await db
       .insert(campaigns)
       .values({
         organizationId: session.organizationId,
+        phoneLineId,
         name: validated.data.name,
         objective: validated.data.objective,
         scriptTemplate: validated.data.scriptTemplate,
@@ -92,6 +105,28 @@ function cleanOptional(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const cleaned = value.trim();
   return cleaned ? cleaned : undefined;
+}
+
+async function getUsablePhoneLineId(
+  organizationId: string,
+  requestedLineId?: string
+): Promise<string | null> {
+  const conditions = [
+    eq(phoneLines.organizationId, organizationId),
+    eq(phoneLines.status, "active"),
+    eq(phoneLines.verificationStatus, "verified"),
+  ];
+
+  if (requestedLineId) {
+    conditions.push(eq(phoneLines.id, requestedLineId));
+  } else {
+    conditions.push(eq(phoneLines.isDefault, true));
+  }
+
+  const line = await db.query.phoneLines.findFirst({
+    where: and(...conditions),
+  });
+  return line?.id ?? null;
 }
 
 function parseQuickCallNumbers(rawNumbers: string): LeadInput[] {
@@ -283,13 +318,26 @@ export async function createQuickCallCampaignAction(formData: FormData) {
   const scriptTemplate =
     cleanOptional(formData.get("scriptTemplate")) ?? DEFAULT_QUICK_CALL_SCRIPT;
   const launchNow = formData.get("launchNow") === "on";
+  const requestedPhoneLineId = cleanOptional(formData.get("phoneLineId"));
 
   try {
+    const phoneLineId = await getUsablePhoneLineId(
+      session.organizationId,
+      requestedPhoneLineId
+    );
+    if (!phoneLineId) {
+      return {
+        error:
+          "Choisissez une ligne téléphonique active et vérifiée avant de lancer les appels.",
+      };
+    }
+
     const [campaign] = await db.transaction(async (tx) => {
       const created = await tx
         .insert(campaigns)
         .values({
           organizationId: session.organizationId,
+          phoneLineId,
           name,
           objective,
           scriptTemplate,

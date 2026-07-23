@@ -1,7 +1,16 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { orders, calls, wallets, campaigns, leads, organizations } from "@/lib/db/schema";
+import {
+  orders,
+  calls,
+  wallets,
+  campaigns,
+  leads,
+  organizations,
+  phoneLines,
+  organizationBillingProfiles,
+} from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import {
   getVapiClient,
@@ -12,12 +21,13 @@ import {
   getFirstMessageForLanguage,
   getVapiWebhookServer,
 } from "@/lib/vapi/client";
-import { hasSufficientBalance } from "@/lib/utils/billing";
+import { hasCallAllowance } from "@/lib/utils/billing";
+import { getBillingPlan } from "@/lib/billing/plans";
 import { getUserSession } from "@/lib/auth";
 import { normalizePhoneNumber } from "@/lib/utils";
 import type { Vapi } from "@vapi-ai/server-sdk";
 import { buildProspectingFirstMessage } from "@/lib/prospecting";
-import { getOutboundPhoneNumberId } from "@/lib/vapi/routing";
+import { resolvePhoneLineVapiId } from "@/lib/vapi/routing";
 
 type AgentVoiceLanguage = "fr" | "ewe";
 
@@ -56,6 +66,44 @@ function summarizeCallStartError(error: unknown): string {
 
 function createLocalFailedCallId(): string {
   return `local_failed_${randomUUID()}`;
+}
+
+async function getOrganizationPhoneLine(
+  organizationId: string,
+  requestedLineId?: string | null
+) {
+  const conditions = [
+    eq(phoneLines.organizationId, organizationId),
+    eq(phoneLines.status, "active"),
+    eq(phoneLines.verificationStatus, "verified"),
+  ];
+  conditions.push(
+    requestedLineId
+      ? eq(phoneLines.id, requestedLineId)
+      : eq(phoneLines.isDefault, true)
+  );
+
+  return db.query.phoneLines.findFirst({ where: and(...conditions) });
+}
+
+async function organizationHasCallAllowance(organizationId: string) {
+  const [wallet, profile] = await Promise.all([
+    db.query.wallets.findFirst({
+      where: eq(wallets.organizationId, organizationId),
+    }),
+    db.query.organizationBillingProfiles.findFirst({
+      where: eq(organizationBillingProfiles.organizationId, organizationId),
+    }),
+  ]);
+  if (!wallet) return false;
+  const plan = getBillingPlan(profile?.planCode);
+  return hasCallAllowance({
+    balanceFcfa: wallet.balanceFcfa,
+    includedMinutesMonthly:
+      profile?.includedMinutesMonthly ?? plan.includedMinutes,
+    usedMinutesThisCycle: profile?.usedMinutesThisCycle ?? "0",
+    bonusMinutesBalance: profile?.bonusMinutesBalance ?? "0",
+  });
 }
 
 export async function POST(req: Request) {
@@ -144,18 +192,19 @@ async function initiateEcommerceCall(
   order: typeof orders.$inferSelect,
   organizationId: string
 ) {
-  // 1. Vérifier le solde du wallet
-  const walletResult = await db
-    .select()
-    .from(wallets)
-    .where(eq(wallets.organizationId, organizationId))
-    .limit(1);
-
-  const wallet = walletResult[0];
-  if (!wallet || !hasSufficientBalance(wallet.balanceFcfa)) {
+  // 1. Vérifier les minutes incluses, bonus ou le wallet.
+  if (!(await organizationHasCallAllowance(organizationId))) {
     return NextResponse.json(
-      { error: "Solde insuffisant. Rechargez votre wallet." },
+      { error: "Minutes épuisées et wallet insuffisant. Ajoutez un pack de minutes." },
       { status: 402 }
+    );
+  }
+
+  const selectedLine = await getOrganizationPhoneLine(organizationId);
+  if (!selectedLine) {
+    return NextResponse.json(
+      { error: "Aucune ligne téléphonique active et vérifiée n’est disponible." },
+      { status: 400 }
     );
   }
 
@@ -186,7 +235,7 @@ async function initiateEcommerceCall(
 
     // 4. Lancer l'appel via le transport adapté à la destination.
     const callResponse = await vapi.calls.create({
-      phoneNumberId: getOutboundPhoneNumberId(customerPhone),
+      phoneNumberId: resolvePhoneLineVapiId(selectedLine, customerPhone),
       customer: {
         number: customerPhone,
         name: order.customerName,
@@ -218,6 +267,7 @@ async function initiateEcommerceCall(
     await db.transaction(async (tx) => {
       await tx.insert(calls).values({
         organizationId,
+        phoneLineId: selectedLine.id,
         vapiCallId,
         orderId: order.id,
         type: "ecommerce_confirmation",
@@ -246,6 +296,7 @@ async function initiateEcommerceCall(
     await db.transaction(async (tx) => {
       await tx.insert(calls).values({
         organizationId,
+        phoneLineId: selectedLine.id,
         vapiCallId: createLocalFailedCallId(),
         orderId: order.id,
         type: "ecommerce_confirmation",
@@ -276,18 +327,12 @@ async function initiateProspectingCall(
   campaignId: string,
   organizationId: string
 ) {
-  // Vérifier le solde
-  const walletResult = await db
-    .select()
-    .from(wallets)
-    .where(eq(wallets.organizationId, organizationId))
-    .limit(1);
-
-  if (
-    !walletResult[0] ||
-    !hasSufficientBalance(walletResult[0].balanceFcfa)
-  ) {
-    return NextResponse.json({ error: "Solde insuffisant." }, { status: 402 });
+  // Vérifier les minutes incluses, bonus ou le wallet.
+  if (!(await organizationHasCallAllowance(organizationId))) {
+    return NextResponse.json(
+      { error: "Minutes épuisées et wallet insuffisant. Ajoutez un pack de minutes." },
+      { status: 402 }
+    );
   }
 
   // Récupérer le lead et la campagne
@@ -321,6 +366,17 @@ async function initiateProspectingCall(
     );
   }
 
+  const selectedLine = await getOrganizationPhoneLine(
+    organizationId,
+    campaign.phoneLineId
+  );
+  if (!selectedLine) {
+    return NextResponse.json(
+      { error: "La ligne de cette campagne n’est plus active ou vérifiée." },
+      { status: 400 }
+    );
+  }
+
   const phone = normalizePhoneNumber(lead.phone, "TG") ?? lead.phone;
   const voiceLanguage = getCampaignVoiceLanguage(campaign.voiceLanguage);
 
@@ -336,7 +392,7 @@ async function initiateProspectingCall(
     const vapi = getVapiClient();
 
     const callResponse = await vapi.calls.create({
-      phoneNumberId: getOutboundPhoneNumberId(phone),
+      phoneNumberId: resolvePhoneLineVapiId(selectedLine, phone),
       customer: {
         number: phone,
         name: lead.name ?? undefined,
@@ -376,6 +432,7 @@ async function initiateProspectingCall(
     await db.transaction(async (tx) => {
       await tx.insert(calls).values({
         organizationId,
+        phoneLineId: selectedLine.id,
         vapiCallId,
         leadId,
         type: "prospecting",
@@ -396,6 +453,7 @@ async function initiateProspectingCall(
     await db.transaction(async (tx) => {
       await tx.insert(calls).values({
         organizationId,
+        phoneLineId: selectedLine.id,
         vapiCallId: createLocalFailedCallId(),
         leadId,
         type: "prospecting",

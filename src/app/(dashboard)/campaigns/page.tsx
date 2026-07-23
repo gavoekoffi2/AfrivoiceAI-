@@ -2,8 +2,13 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getUserSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { campaigns, leadDatabasePurchases, leadDatabases } from "@/lib/db/schema";
-import { eq, desc, inArray } from "drizzle-orm";
+import {
+  campaigns,
+  leadDatabasePurchases,
+  leadDatabases,
+  phoneLines,
+} from "@/lib/db/schema";
+import { and, eq, desc, inArray } from "drizzle-orm";
 import {
   Card,
   CardContent,
@@ -48,8 +53,31 @@ export default async function CampaignsPage() {
 
   let allCampaigns: any[] = [];
   let purchasedDatabases: any[] = [];
+  let availablePhoneLines: Array<{
+    id: string;
+    name: string;
+    phoneNumber: string | null;
+    isDefault: boolean;
+  }> = [];
 
   try {
+    availablePhoneLines = await db
+      .select({
+        id: phoneLines.id,
+        name: phoneLines.name,
+        phoneNumber: phoneLines.phoneNumber,
+        isDefault: phoneLines.isDefault,
+      })
+      .from(phoneLines)
+      .where(
+        and(
+          eq(phoneLines.organizationId, session.organizationId),
+          eq(phoneLines.status, "active"),
+          eq(phoneLines.verificationStatus, "verified")
+        )
+      )
+      .orderBy(desc(phoneLines.isDefault), desc(phoneLines.createdAt));
+
     allCampaigns = await db
       .select()
       .from(campaigns)
@@ -85,7 +113,7 @@ export default async function CampaignsPage() {
             Testez quelques appels rapidement ou lancez une campagne avec une base complète.
           </p>
         </div>
-        <CreateCampaignDialog />
+        <CreateCampaignDialog phoneLines={availablePhoneLines} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
@@ -100,7 +128,7 @@ export default async function CampaignsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <QuickCallLauncher />
+            <QuickCallLauncher phoneLines={availablePhoneLines} />
           </CardContent>
         </Card>
 
@@ -189,7 +217,7 @@ export default async function CampaignsPage() {
               Créez votre première campagne de prospection pour automatiser
               vos appels sortants avec l&apos;IA.
             </p>
-            <CreateCampaignDialog />
+            <CreateCampaignDialog phoneLines={availablePhoneLines} />
           </CardContent>
         </Card>
       ) : (

@@ -24,3 +24,31 @@ export function getOutboundPhoneNumberId(destination: string): string {
 
   return defaultPhoneNumberId;
 }
+
+export type RoutablePhoneLine = {
+  connectionType: string;
+  status: string;
+  verificationStatus: string;
+  vapiPhoneNumberId: string | null;
+};
+
+export function resolvePhoneLineVapiId(
+  line: RoutablePhoneLine,
+  destination: string
+): string {
+  if (line.status !== "active" || line.verificationStatus !== "verified") {
+    throw new Error("La ligne choisie n’est pas encore active et vérifiée.");
+  }
+
+  if (line.connectionType === "platform") {
+    return getOutboundPhoneNumberId(destination);
+  }
+
+  if (!line.vapiPhoneNumberId) {
+    throw new Error(
+      "La ligne choisie est vérifiée mais son identifiant téléphonique Vapi est manquant."
+    );
+  }
+
+  return line.vapiPhoneNumberId;
+}

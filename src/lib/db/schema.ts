@@ -75,6 +75,78 @@ export const transactions = pgTable(
   })
 );
 
+export const organizationBillingProfiles = pgTable(
+  "organization_billing_profiles",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .references(() => organizations.id, { onDelete: "cascade" })
+      .notNull()
+      .unique(),
+    planCode: text("plan_code").default("essential").notNull(),
+    status: text("status").default("trial").notNull(),
+    includedMinutesMonthly: integer("included_minutes_monthly")
+      .default(60)
+      .notNull(),
+    usedMinutesThisCycle: decimal("used_minutes_this_cycle", {
+      precision: 12,
+      scale: 2,
+    })
+      .default("0")
+      .notNull(),
+    bonusMinutesBalance: decimal("bonus_minutes_balance", {
+      precision: 12,
+      scale: 2,
+    })
+      .default("0")
+      .notNull(),
+    billingCycleStartedAt: timestamp("billing_cycle_started_at")
+      .defaultNow()
+      .notNull(),
+    billingCycleEndsAt: timestamp("billing_cycle_ends_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    orgIdx: uniqueIndex("organization_billing_profiles_org_idx").on(
+      table.organizationId
+    ),
+  })
+);
+
+export const phoneLines = pgTable(
+  "phone_lines",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .references(() => organizations.id, { onDelete: "cascade" })
+      .notNull(),
+    name: text("name").notNull(),
+    phoneNumber: text("phone_number"),
+    connectionType: text("connection_type").notNull(),
+    provider: text("provider").notNull(),
+    status: text("status").default("pending").notNull(),
+    verificationStatus: text("verification_status").default("pending").notNull(),
+    verificationMethod: text("verification_method"),
+    vapiPhoneNumberId: text("vapi_phone_number_id"),
+    vapiCredentialId: text("vapi_credential_id"),
+    externalReference: text("external_reference"),
+    publicConfig: jsonb("public_config").$type<Record<string, unknown>>(),
+    isDefault: boolean("is_default").default(false).notNull(),
+    lastHealthCheckAt: timestamp("last_health_check_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    orgIdx: index("phone_lines_org_idx").on(table.organizationId),
+    statusIdx: index("phone_lines_status_idx").on(table.status),
+    orgPhoneUnique: uniqueIndex("phone_lines_org_phone_unique").on(
+      table.organizationId,
+      table.phoneNumber
+    ),
+  })
+);
+
 // 3. Module E-commerce (Commandes COD)
 export const orders = pgTable(
   "orders",
@@ -108,6 +180,9 @@ export const campaigns = pgTable(
     organizationId: uuid("organization_id")
       .references(() => organizations.id, { onDelete: "cascade" })
       .notNull(),
+    phoneLineId: uuid("phone_line_id").references(() => phoneLines.id, {
+      onDelete: "set null",
+    }),
     name: text("name").notNull(),
     objective: text("objective").notNull(),
     scriptTemplate: text("script_template").notNull(), // Prompt pour l'IA
@@ -279,6 +354,9 @@ export const calls = pgTable(
     organizationId: uuid("organization_id")
       .references(() => organizations.id, { onDelete: "cascade" })
       .notNull(),
+    phoneLineId: uuid("phone_line_id").references(() => phoneLines.id, {
+      onDelete: "set null",
+    }),
     vapiCallId: text("vapi_call_id").unique().notNull(),
     orderId: uuid("order_id").references(() => orders.id, {
       onDelete: "set null",
@@ -289,6 +367,10 @@ export const calls = pgTable(
     durationSeconds: integer("duration_seconds"),
     costUsd: decimal("cost_usd", { precision: 10, scale: 4 }), // Coût brut API
     costFcfa: decimal("cost_fcfa", { precision: 10, scale: 2 }), // Coût facturé client
+    billedMinuteRateFcfa: decimal("billed_minute_rate_fcfa", {
+      precision: 10,
+      scale: 2,
+    }),
     recordingUrl: text("recording_url"),
     transcript: text("transcript"),
     summary: text("summary"),
@@ -322,6 +404,12 @@ export type Wallet = typeof wallets.$inferSelect;
 export type NewWallet = typeof wallets.$inferInsert;
 export type Transaction = typeof transactions.$inferSelect;
 export type NewTransaction = typeof transactions.$inferInsert;
+export type OrganizationBillingProfile =
+  typeof organizationBillingProfiles.$inferSelect;
+export type NewOrganizationBillingProfile =
+  typeof organizationBillingProfiles.$inferInsert;
+export type PhoneLine = typeof phoneLines.$inferSelect;
+export type NewPhoneLine = typeof phoneLines.$inferInsert;
 export type Order = typeof orders.$inferSelect;
 export type NewOrder = typeof orders.$inferInsert;
 export type Campaign = typeof campaigns.$inferSelect;

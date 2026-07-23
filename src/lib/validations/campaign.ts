@@ -9,6 +9,7 @@ export const createCampaignSchema = z.object({
     .string()
     .min(50, "Le script (prompt) est trop court. Fournissez plus de contexte."),
   voiceLanguage: z.enum(["fr", "ewe"]).default("fr"),
+  phoneLineId: z.string().uuid("Ligne téléphonique invalide.").optional(),
 });
 
 export const updateCampaignSchema = createCampaignSchema.partial().extend({

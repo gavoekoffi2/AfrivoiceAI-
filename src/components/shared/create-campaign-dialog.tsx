@@ -26,7 +26,18 @@ import {
 } from "@/components/ui/dialog";
 import { createCampaignAction } from "@/app/actions/campaigns";
 
-export function CreateCampaignDialog() {
+type PhoneLineOption = {
+  id: string;
+  name: string;
+  phoneNumber: string | null;
+  isDefault: boolean;
+};
+
+export function CreateCampaignDialog({
+  phoneLines,
+}: {
+  phoneLines: PhoneLineOption[];
+}) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -85,6 +96,35 @@ export function CreateCampaignDialog() {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="phoneLineId">Numéro utilisé pour appeler *</Label>
+            <Select
+              name="phoneLineId"
+              defaultValue={
+                phoneLines.find((line) => line.isDefault)?.id ?? phoneLines[0]?.id
+              }
+              disabled={phoneLines.length === 0}
+            >
+              <SelectTrigger id="phoneLineId">
+                <SelectValue placeholder="Choisir une ligne active" />
+              </SelectTrigger>
+              <SelectContent>
+                {phoneLines.map((line) => (
+                  <SelectItem key={line.id} value={line.id}>
+                    {line.name}
+                    {line.phoneNumber ? ` — ${line.phoneNumber}` : ""}
+                    {line.isDefault ? " (par défaut)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {phoneLines.length === 0 && (
+              <p className="text-xs text-destructive">
+                Connectez et faites vérifier une ligne téléphonique avant de créer une campagne.
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="voiceLanguage">Langue / voix de l&apos;agent *</Label>
             <Select name="voiceLanguage" defaultValue="fr">
               <SelectTrigger id="voiceLanguage">
@@ -127,7 +167,11 @@ export function CreateCampaignDialog() {
             >
               Annuler
             </Button>
-            <Button type="submit" disabled={isPending} className="gap-2">
+            <Button
+              type="submit"
+              disabled={isPending || phoneLines.length === 0}
+              className="gap-2"
+            >
               {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Créer la campagne
             </Button>

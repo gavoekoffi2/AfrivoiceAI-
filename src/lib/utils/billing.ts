@@ -42,6 +42,18 @@ export function hasSufficientBalance(balanceFcfa: number | string): boolean {
   return balance >= estimateMinimumCallCost();
 }
 
+export function hasCallAllowance(input: {
+  balanceFcfa: number | string;
+  includedMinutesMonthly: number;
+  usedMinutesThisCycle: number | string;
+  bonusMinutesBalance: number | string;
+}): boolean {
+  const used = Number(input.usedMinutesThisCycle);
+  const bonus = Number(input.bonusMinutesBalance);
+  const monthlyRemaining = Math.max(0, input.includedMinutesMonthly - used);
+  return monthlyRemaining + Math.max(0, bonus) > 0 || hasSufficientBalance(input.balanceFcfa);
+}
+
 /**
  * Formate le taux de change actuel
  */

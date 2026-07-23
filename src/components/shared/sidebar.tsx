@@ -11,6 +11,7 @@ import {
   Settings,
   ShieldCheck,
   PhoneCall,
+  RadioTower,
   Mic2,
   Globe,
   LogOut,
@@ -52,6 +53,11 @@ const mainNavItems = [
     title: "Clonage voix",
     href: "/voice-cloning",
     icon: Mic2,
+  },
+  {
+    title: "Lignes téléphoniques",
+    href: "/phone-lines",
+    icon: RadioTower,
   },
   {
     title: "Wallet",

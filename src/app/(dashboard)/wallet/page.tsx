@@ -12,7 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { Wallet, ArrowUpCircle, ArrowDownCircle, Plus } from "lucide-react";
 import { formatFcfa } from "@/lib/utils";
 import { WalletDepositButton } from "@/components/shared/wallet-deposit-button";
-import type { Transaction } from "@/lib/db/schema";
+import { MinutePackPicker } from "@/components/shared/minute-pack-picker";
+import { db } from "@/lib/db";
+import { organizationBillingProfiles, type Transaction } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { getBillingPlan } from "@/lib/billing/plans";
 
 export const dynamic = "force-dynamic";
 
@@ -20,10 +24,20 @@ export default async function WalletPage() {
   const session = await getUserSession();
   if (!session) redirect("/login");
 
-  const data = await getWalletWithTransactions(session.organizationId);
+  const [data, billingProfile] = await Promise.all([
+    getWalletWithTransactions(session.organizationId),
+    db.query.organizationBillingProfiles.findFirst({
+      where: eq(organizationBillingProfiles.organizationId, session.organizationId),
+    }),
+  ]);
 
   const balance = parseFloat(data?.wallet.balanceFcfa ?? "0");
   const txList: Transaction[] = data?.transactions ?? [];
+  const plan = getBillingPlan(billingProfile?.planCode);
+  const includedMinutes = billingProfile?.includedMinutesMonthly ?? plan.includedMinutes;
+  const usedMinutes = Number(billingProfile?.usedMinutesThisCycle ?? 0);
+  const bonusMinutes = Number(billingProfile?.bonusMinutesBalance ?? 0);
+  const monthlyMinutesRemaining = Math.max(0, includedMinutes - usedMinutes);
 
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
@@ -57,38 +71,46 @@ export default async function WalletPage() {
           </CardContent>
         </Card>
 
-        {/* Informations de facturation */}
+        {/* Minutes du forfait */}
         <Card>
           <CardHeader>
-            <CardTitle>Tarification</CardTitle>
+            <CardTitle>Minutes disponibles</CardTitle>
             <CardDescription>
-              Coût des appels IA (marge 30% incluse)
+              Forfait {plan.name} — votre activité continue avec les packs bonus
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Taux de change</span>
-              <span className="font-medium">1 USD = 600 FCFA</span>
+              <span className="text-muted-foreground">Incluses ce mois</span>
+              <span className="font-medium">{includedMinutes.toLocaleString("fr-TG")} min</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Marge appliquée</span>
-              <span className="font-medium">+30%</span>
+              <span className="text-muted-foreground">Utilisées</span>
+              <span className="font-medium">{usedMinutes.toFixed(1)} min</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">
-                Coût estimé / appel (1 min)
-              </span>
-              <span className="font-medium">~52 FCFA</span>
+              <span className="text-muted-foreground">Restantes du forfait</span>
+              <span className="font-medium text-emerald-600">{monthlyMinutesRemaining.toFixed(1)} min</span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">
-                Coût estimé / appel (3 min)
-              </span>
-              <span className="font-medium">~156 FCFA</span>
+            <div className="flex justify-between border-t pt-3 text-sm">
+              <span className="text-muted-foreground">Minutes bonus achetées</span>
+              <span className="font-semibold text-primary">{bonusMinutes.toFixed(1)} min</span>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Ajouter des minutes à tout moment</CardTitle>
+          <CardDescription>
+            Les minutes bonus ne remplacent pas votre forfait et restent disponibles jusqu’à leur utilisation. Le montant est débité de votre wallet.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <MinutePackPicker />
+        </CardContent>
+      </Card>
 
       {/* Historique des transactions */}
       <Card>

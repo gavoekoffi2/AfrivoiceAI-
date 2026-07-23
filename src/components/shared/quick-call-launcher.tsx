@@ -30,7 +30,18 @@ function todayLabel() {
   }).format(new Date());
 }
 
-export function QuickCallLauncher() {
+type PhoneLineOption = {
+  id: string;
+  name: string;
+  phoneNumber: string | null;
+  isDefault: boolean;
+};
+
+export function QuickCallLauncher({
+  phoneLines,
+}: {
+  phoneLines: PhoneLineOption[];
+}) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -203,6 +214,33 @@ export function QuickCallLauncher() {
       </div>
 
       <div className="space-y-2">
+        <Label htmlFor="quick-phone-line">Numéro utilisé pour appeler *</Label>
+        <select
+          id="quick-phone-line"
+          name="phoneLineId"
+          defaultValue={
+            phoneLines.find((line) => line.isDefault)?.id ?? phoneLines[0]?.id
+          }
+          disabled={busy || phoneLines.length === 0}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          required
+        >
+          {phoneLines.map((line) => (
+            <option key={line.id} value={line.id}>
+              {line.name}
+              {line.phoneNumber ? ` — ${line.phoneNumber}` : ""}
+              {line.isDefault ? " (par défaut)" : ""}
+            </option>
+          ))}
+        </select>
+        {phoneLines.length === 0 && (
+          <p className="text-xs text-destructive">
+            Aucune ligne active. Connectez d’abord un numéro dans « Lignes téléphoniques ».
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-2">
         <Label htmlFor="quick-numbers">Numéros à appeler *</Label>
         <Textarea
           id="quick-numbers"
@@ -249,7 +287,11 @@ export function QuickCallLauncher() {
         </span>
       </label>
 
-      <Button type="submit" disabled={busy} className="w-full gap-2">
+      <Button
+        type="submit"
+        disabled={busy || phoneLines.length === 0}
+        className="w-full gap-2"
+      >
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PhoneCall className="h-4 w-4" />}
         {isLaunching ? "Lancement des appels..." : "Lancer un test rapide"}
       </Button>

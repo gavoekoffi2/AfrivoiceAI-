@@ -1,9 +1,20 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { calls, orders, leads, wallets, transactions } from "@/lib/db/schema";
-import { eq, sql } from "drizzle-orm";
+import {
+  calls,
+  orders,
+  leads,
+  wallets,
+  transactions,
+  organizationBillingProfiles,
+} from "@/lib/db/schema";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { verifyVapiWebhook } from "@/lib/vapi/verify";
-import { calculateClientCostFcfa } from "@/lib/utils/billing";
+import {
+  allocateBillableMinutes,
+  calculateCallChargeFcfa,
+  getBillingPlan,
+} from "@/lib/billing/plans";
 import { classifyProspectingOutcome } from "@/lib/prospecting";
 import { extractVapiCallArtifacts } from "@/lib/vapi/artifacts";
 
@@ -126,18 +137,55 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Appel introuvable" }, { status: 404 });
       }
 
+      // Idempotence financière : un rapport Vapi répété ne doit jamais redébiter.
+      if (dbCall.status === "completed" && dbCall.costFcfa !== null) {
+        return NextResponse.json({ received: true, processed: true, duplicate: true });
+      }
+
       const costUsd = call.cost ?? 0;
-      const costFcfa = calculateClientCostFcfa(costUsd);
       const durationSeconds = call.duration ?? 0;
 
-      // Récupérer le wallet
-      const walletResult = await db
-        .select()
-        .from(wallets)
-        .where(eq(wallets.organizationId, dbCall.organizationId))
-        .limit(1);
+      const [walletResult, billingProfile] = await Promise.all([
+        db
+          .select()
+          .from(wallets)
+          .where(eq(wallets.organizationId, dbCall.organizationId))
+          .limit(1),
+        db.query.organizationBillingProfiles.findFirst({
+          where: eq(
+            organizationBillingProfiles.organizationId,
+            dbCall.organizationId
+          ),
+        }),
+      ]);
 
       const wallet = walletResult[0];
+      let plan = getBillingPlan(billingProfile?.planCode);
+      let charge = calculateCallChargeFcfa({
+        planCode: plan.code,
+        durationSeconds,
+        providerCostUsd: costUsd,
+        exchangeRateUsdToFcfa: 620,
+      });
+      const includedMinutes =
+        billingProfile?.includedMinutesMonthly ?? plan.includedMinutes;
+      const usedMinutes = Number(billingProfile?.usedMinutesThisCycle ?? 0);
+      const bonusMinutes = Number(billingProfile?.bonusMinutesBalance ?? 0);
+      let allocation = allocateBillableMinutes({
+        billableMinutes: charge.billableMinutes,
+        monthlyMinutesRemaining: Math.max(0, includedMinutes - usedMinutes),
+        bonusMinutesBalance: bonusMinutes,
+      });
+      const coveredMinuteValue =
+        (allocation.monthlyMinutesUsed + allocation.bonusMinutesUsed) *
+        plan.minuteRateFcfa;
+      let costFcfa = Math.ceil(
+        Math.max(
+          allocation.overageMinutes * plan.minuteRateFcfa,
+          charge.providerFloorFcfa - coveredMinuteValue,
+          0
+        )
+      );
 
       // Analyser l'issue de la commande
       let orderOutcome: "confirmed" | "cancelled" | "no_answer" | null = null;
@@ -147,14 +195,63 @@ export async function POST(req: Request) {
 
       // Transaction atomique : mettre à jour l'appel + déduire du wallet
       await db.transaction(async (tx) => {
-        // 1. Mettre à jour l'appel
-        await tx
+        // Sérialiser la consommation des minutes pour une même organisation.
+        await tx.execute(sql`
+          SELECT organization_id
+          FROM organization_billing_profiles
+          WHERE organization_id = ${dbCall.organizationId}
+          FOR UPDATE
+        `);
+        const lockedProfile =
+          await tx.query.organizationBillingProfiles.findFirst({
+            where: eq(
+              organizationBillingProfiles.organizationId,
+              dbCall.organizationId
+            ),
+          });
+        plan = getBillingPlan(lockedProfile?.planCode);
+        charge = calculateCallChargeFcfa({
+          planCode: plan.code,
+          durationSeconds,
+          providerCostUsd: costUsd,
+          exchangeRateUsdToFcfa: 620,
+        });
+        const lockedIncludedMinutes =
+          lockedProfile?.includedMinutesMonthly ?? plan.includedMinutes;
+        const lockedUsedMinutes = Number(
+          lockedProfile?.usedMinutesThisCycle ?? 0
+        );
+        const lockedBonusMinutes = Number(
+          lockedProfile?.bonusMinutesBalance ?? 0
+        );
+        allocation = allocateBillableMinutes({
+          billableMinutes: charge.billableMinutes,
+          monthlyMinutesRemaining: Math.max(
+            0,
+            lockedIncludedMinutes - lockedUsedMinutes
+          ),
+          bonusMinutesBalance: lockedBonusMinutes,
+        });
+        const lockedCoveredValue =
+          (allocation.monthlyMinutesUsed + allocation.bonusMinutesUsed) *
+          plan.minuteRateFcfa;
+        costFcfa = Math.ceil(
+          Math.max(
+            allocation.overageMinutes * plan.minuteRateFcfa,
+            charge.providerFloorFcfa - lockedCoveredValue,
+            0
+          )
+        );
+
+        // 1. Mettre à jour l'appel une seule fois, même en cas de webhook concurrent.
+        const claimedCall = await tx
           .update(calls)
           .set({
-            status: call.status === "ended" ? "completed" : call.status,
+            status: "completed",
             durationSeconds,
             costUsd: costUsd.toString(),
             costFcfa: costFcfa.toString(),
+            billedMinuteRateFcfa: plan.minuteRateFcfa.toString(),
             recordingUrl: recordingUrl ?? null,
             transcript: transcript ?? null,
             summary: summary ?? null,
@@ -162,9 +259,34 @@ export async function POST(req: Request) {
             callArtifact: rawArtifact ?? null,
             endedReason: call.endedReason ?? null,
           })
-          .where(eq(calls.id, dbCall.id));
+          .where(
+            and(eq(calls.id, dbCall.id), ne(calls.status, "completed"))
+          )
+          .returning({ id: calls.id });
 
-        // 2. Déduire le coût du wallet (si coût > 0)
+        if (!claimedCall[0]) return;
+
+        // 2. Consommer d’abord le forfait mensuel, puis les minutes bonus.
+        await tx
+          .insert(organizationBillingProfiles)
+          .values({
+            organizationId: dbCall.organizationId,
+            planCode: plan.code,
+            status: "active",
+            includedMinutesMonthly: plan.includedMinutes,
+            usedMinutesThisCycle: allocation.monthlyMinutesUsed.toString(),
+            bonusMinutesBalance: "0",
+          })
+          .onConflictDoUpdate({
+            target: organizationBillingProfiles.organizationId,
+            set: {
+              usedMinutesThisCycle: sql`${organizationBillingProfiles.usedMinutesThisCycle} + ${allocation.monthlyMinutesUsed}`,
+              bonusMinutesBalance: sql`${organizationBillingProfiles.bonusMinutesBalance} - ${allocation.bonusMinutesUsed}`,
+              updatedAt: new Date(),
+            },
+          });
+
+        // 3. Déduire uniquement le dépassement ou le surcoût fournisseur.
         if (wallet && costFcfa > 0) {
           await tx.insert(transactions).values({
             walletId: wallet.id,
@@ -175,6 +297,11 @@ export async function POST(req: Request) {
               vapiCallId: call.id,
               costUsd,
               durationSeconds,
+              planCode: plan.code,
+              monthlyMinutesUsed: allocation.monthlyMinutesUsed,
+              bonusMinutesUsed: allocation.bonusMinutesUsed,
+              overageMinutes: allocation.overageMinutes,
+              providerFloorFcfa: charge.providerFloorFcfa,
             },
           });
 
