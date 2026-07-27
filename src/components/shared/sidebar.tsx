@@ -11,6 +11,7 @@ import {
   Settings,
   ShieldCheck,
   PhoneCall,
+  Headphones,
   RadioTower,
   Mic2,
   Globe,
@@ -43,6 +44,11 @@ const mainNavItems = [
     title: "Appels",
     href: "/calls",
     icon: PhoneCall,
+  },
+  {
+    title: "Démo vocale live",
+    href: "/demo-vocale",
+    icon: Headphones,
   },
   {
     title: "Voix africaines",
