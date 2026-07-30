@@ -5,7 +5,10 @@ let vapiInstance: VapiClient | null = null;
 
 
 export function getFrenchVoice(): Vapi.CreateAssistantDtoVoice {
-  const elevenLabsFrenchVoiceId = process.env.ELEVENLABS_FRENCH_VOICE_ID;
+  // ELEVENLABS_VOICE_ID is kept as a backward-compatible production alias.
+  // It lets the Docker deployment use the selected AfrivoxAI voice explicitly.
+  const elevenLabsFrenchVoiceId =
+    process.env.ELEVENLABS_FRENCH_VOICE_ID ?? process.env.ELEVENLABS_VOICE_ID;
 
   if (elevenLabsFrenchVoiceId) {
     return {
