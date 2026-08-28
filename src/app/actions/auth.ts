@@ -12,7 +12,15 @@ import {
 } from "@/lib/db/schema";
 import { registerSchema, loginSchema } from "@/lib/validations/auth";
 import { getRegistrationErrorMessage } from "@/lib/auth-errors";
-import { generateSlug } from "@/lib/utils";
+
+function generateOrganizationSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 import {
   createAuthSession,
   destroyAuthSession,
@@ -37,14 +45,20 @@ export async function registerAction(formData: FormData) {
 
   if (isDemoAuthMode()) redirect("/dashboard");
 
-  const existing = await db.query.users.findFirst({
-    where: eq(users.email, validated.data.email),
-  });
+  let existing;
+  try {
+    existing = await db.query.users.findFirst({
+      where: eq(users.email, validated.data.email),
+    });
+  } catch (error) {
+    console.error("[auth/register] Lecture utilisateur impossible:", error);
+    return { error: "La base de données est momentanément indisponible. Réessayez dans un instant." };
+  }
   if (existing) return { error: "Un compte existe déjà avec cet email." };
 
   const password = await hashPassword(validated.data.password);
   const userId = randomUUID();
-  const slug = `${generateSlug(validated.data.organizationName)}-${userId.slice(0, 8)}`;
+  const slug = `${generateOrganizationSlug(validated.data.organizationName)}-${userId.slice(0, 8)}`;
 
   try {
     await db.transaction(async (tx) => {
