@@ -134,7 +134,7 @@ export function Sidebar({ organizationName, userEmail, userRole }: SidebarProps)
         </p>
         <div className="space-y-2 rounded-3xl border border-white/10 bg-white/[0.035] p-2">
           <Link
-            href="/"
+            href="/dashboard"
             className={cn(
               "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition-all",
               pathname !== "/e-commerce"

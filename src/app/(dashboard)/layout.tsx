@@ -1,6 +1,7 @@
 import { getUserSession } from "@/lib/auth";
 import { getOrganizationStats } from "@/lib/db/queries";
 import { DashboardShell } from "@/components/shared/dashboard-shell";
+import { redirect } from "next/navigation";
 
 export default async function DashboardLayout({
   children,
@@ -10,7 +11,7 @@ export default async function DashboardLayout({
   const session = await getUserSession();
 
   if (!session) {
-    return <>{children}</>;
+    redirect("/login");
   }
 
   const stats = await getOrganizationStats(session.organizationId);

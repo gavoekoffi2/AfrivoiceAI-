@@ -16,7 +16,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { requireSession } from "@/lib/auth";
+import { getUserSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import {
   getOrganizationStats,
   getRecentCalls,
@@ -28,7 +29,10 @@ import { CallsChart } from "@/components/shared/calls-chart";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardOverview() {
-  const session = await requireSession();
+  const session = await getUserSession();
+  if (!session) {
+    redirect("/login");
+  }
 
   const [stats, recentCalls, chartData] = await Promise.all([
     getOrganizationStats(session.organizationId),

@@ -32,6 +32,10 @@ function getDemoSession(): UserSession {
 }
 
 export async function getUserSession(): Promise<UserSession | null> {
+  if (process.env.AFRIVOXAI_DEMO_AUTH === "true") {
+    return getDemoSession();
+  }
+
   try {
     const supabase = createSupabaseServerClient();
     const {
@@ -39,7 +43,7 @@ export async function getUserSession(): Promise<UserSession | null> {
       error,
     } = await supabase.auth.getUser();
 
-    if (error || !authUser) return getDemoSession();
+    if (error || !authUser) return null;
 
     const result = await db
       .select({
@@ -59,7 +63,7 @@ export async function getUserSession(): Promise<UserSession | null> {
       .limit(1);
 
     const session = result[0];
-    if (!session || !session.isActive) return getDemoSession();
+    if (!session || !session.isActive) return null;
 
     return {
       ...session,
@@ -68,8 +72,8 @@ export async function getUserSession(): Promise<UserSession | null> {
         : null,
     };
   } catch (error) {
-    console.warn("[auth] Session réelle indisponible, accès démo activé:", error);
-    return getDemoSession();
+    console.warn("[auth] Session réelle indisponible:", error);
+    return null;
   }
 }
 

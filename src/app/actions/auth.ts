@@ -12,16 +12,7 @@ import { getRegistrationErrorMessage } from "@/lib/auth-errors";
 import { generateSlug } from "@/lib/utils";
 
 function isDemoAuthMode() {
-  return (
-    process.env.AFRIVOXAI_DEMO_AUTH === "true" ||
-    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    !process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    !process.env.DATABASE_URL ||
-    process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder") ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.includes("placeholder") ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY.includes("placeholder")
-  );
+  return process.env.AFRIVOXAI_DEMO_AUTH === "true";
 }
 
 export async function registerAction(formData: FormData) {
@@ -39,7 +30,7 @@ export async function registerAction(formData: FormData) {
   }
 
   if (isDemoAuthMode()) {
-    redirect("/calls");
+    redirect("/dashboard");
   }
 
   const serviceSupabase = createSupabaseServiceClient();
@@ -111,7 +102,7 @@ export async function registerAction(formData: FormData) {
     };
   }
 
-  redirect("/calls");
+  redirect("/dashboard");
 }
 
 export async function loginAction(formData: FormData) {
@@ -126,7 +117,7 @@ export async function loginAction(formData: FormData) {
   }
 
   if (isDemoAuthMode()) {
-    redirect("/calls");
+    redirect("/dashboard");
   }
 
   const supabase = createSupabaseServerClient();
@@ -140,7 +131,7 @@ export async function loginAction(formData: FormData) {
     return { error: "Email ou mot de passe incorrect." };
   }
 
-  redirect("/calls");
+  redirect("/dashboard");
 }
 
 export async function logoutAction() {
