@@ -10,7 +10,7 @@ export function verifyVapiWebhook(
   if (!signature) return false;
 
   const secret = process.env.VAPI_WEBHOOK_SECRET;
-  if (!secret) return true; // En dev sans secret configuré
+  if (!secret) return false;
 
   const computedHash = crypto
     .createHmac("sha256", secret)

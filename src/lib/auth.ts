@@ -1,7 +1,4 @@
-import { createSupabaseServerClient } from "./supabase/server";
-import { db } from "./db";
-import { users, organizations } from "./db/schema";
-import { eq } from "drizzle-orm";
+import { getLocalAuthUser } from "./auth-local";
 
 export type UserSession = {
   id: string;
@@ -27,69 +24,23 @@ const DEMO_SESSION: UserSession = {
   organizationName: "AfrivoxAI Demo",
 };
 
-function getDemoSession(): UserSession {
-  return DEMO_SESSION;
-}
-
 export async function getUserSession(): Promise<UserSession | null> {
-  if (process.env.AFRIVOXAI_DEMO_AUTH === "true") {
-    return getDemoSession();
-  }
+  if (process.env.AFRIVOXAI_DEMO_AUTH === "true") return DEMO_SESSION;
 
   try {
-    const supabase = createSupabaseServerClient();
-    const {
-      data: { user: authUser },
-      error,
-    } = await supabase.auth.getUser();
-
-    if (error || !authUser) return null;
-
-    const result = await db
-      .select({
-        id: users.id,
-        email: users.email,
-        role: users.role,
-        subscriptionPlan: users.subscriptionPlan,
-        subscriptionExpiresAt: users.subscriptionExpiresAt,
-        isActive: users.isActive,
-        adminPermissions: users.adminPermissions,
-        organizationId: users.organizationId,
-        organizationName: organizations.name,
-      })
-      .from(users)
-      .innerJoin(organizations, eq(users.organizationId, organizations.id))
-      .where(eq(users.id, authUser.id))
-      .limit(1);
-
-    const session = result[0];
-    if (!session || !session.isActive) return null;
-
-    return {
-      ...session,
-      adminPermissions: Array.isArray(session.adminPermissions)
-        ? (session.adminPermissions as string[])
-        : null,
-    };
+    return await getLocalAuthUser();
   } catch (error) {
-    console.warn("[auth] Session réelle indisponible:", error);
+    console.warn("[auth] Session locale indisponible:", error);
     return null;
   }
 }
 
 export async function requireSession(): Promise<UserSession> {
   const session = await getUserSession();
-  if (!session) {
-    throw new Error("Non autorisé - Session requise");
-  }
+  if (!session) throw new Error("Non autorisé - Session requise");
   return session;
 }
 
-// Pour les API Routes (Request object)
-export async function checkAuthFromRequest(req: Request): Promise<UserSession | null> {
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader) return null;
-
-  // Utiliser le cookie de session depuis les headers
+export async function checkAuthFromRequest(_req: Request): Promise<UserSession | null> {
   return getUserSession();
 }

@@ -1,15 +1,23 @@
 "use server";
 
-import {
-  createSupabaseServerClient,
-  createSupabaseServiceClient,
-} from "@/lib/supabase/server";
-import { registerSchema, loginSchema } from "@/lib/validations/auth";
+import { randomUUID } from "crypto";
 import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { organizations, users, wallets } from "@/lib/db/schema";
+import {
+  organizationBillingProfiles,
+  organizations,
+  users,
+  wallets,
+} from "@/lib/db/schema";
+import { registerSchema, loginSchema } from "@/lib/validations/auth";
 import { getRegistrationErrorMessage } from "@/lib/auth-errors";
 import { generateSlug } from "@/lib/utils";
+import {
+  createAuthSession,
+  destroyAuthSession,
+} from "@/lib/auth-local";
+import { hashPassword, verifyPassword } from "@/lib/auth-crypto";
 
 function isDemoAuthMode() {
   return process.env.AFRIVOXAI_DEMO_AUTH === "true";
@@ -17,43 +25,26 @@ function isDemoAuthMode() {
 
 export async function registerAction(formData: FormData) {
   const rawData = {
-    email: formData.get("email") as string,
-    password: formData.get("password") as string,
-    organizationName: formData.get("organizationName") as string,
+    email: String(formData.get("email") ?? "").trim().toLowerCase(),
+    password: String(formData.get("password") ?? ""),
+    organizationName: String(formData.get("organizationName") ?? "").trim(),
   };
 
   const validated = registerSchema.safeParse(rawData);
   if (!validated.success) {
-    return {
-      error: validated.error.errors[0].message,
-    };
+    return { error: validated.error.errors[0].message };
   }
 
-  if (isDemoAuthMode()) {
-    redirect("/dashboard");
-  }
+  if (isDemoAuthMode()) redirect("/dashboard");
 
-  const serviceSupabase = createSupabaseServiceClient();
-
-  const { data, error } = await serviceSupabase.auth.admin.createUser({
-    email: validated.data.email,
-    password: validated.data.password,
-    email_confirm: true,
-    user_metadata: {
-      organization_name: validated.data.organizationName,
-    },
+  const existing = await db.query.users.findFirst({
+    where: eq(users.email, validated.data.email),
   });
+  if (existing) return { error: "Un compte existe déjà avec cet email." };
 
-  if (error) {
-    return { error: getRegistrationErrorMessage(error.message) };
-  }
-
-  if (!data.user) {
-    return { error: "Impossible de créer le compte. Réessayez." };
-  }
-
-  const slugBase = generateSlug(validated.data.organizationName);
-  const slug = `${slugBase}-${data.user.id.slice(0, 8)}`;
+  const password = await hashPassword(validated.data.password);
+  const userId = randomUUID();
+  const slug = `${generateSlug(validated.data.organizationName)}-${userId.slice(0, 8)}`;
 
   try {
     await db.transaction(async (tx) => {
@@ -67,9 +58,12 @@ export async function registerAction(formData: FormData) {
         .returning();
 
       await tx.insert(users).values({
-        id: data.user!.id,
+        id: userId,
         organizationId: organization.id,
         email: validated.data.email,
+        passwordHash: password.hash,
+        passwordSalt: password.salt,
+        passwordResetRequired: false,
         role: "owner",
       });
 
@@ -77,65 +71,54 @@ export async function registerAction(formData: FormData) {
         organizationId: organization.id,
         balanceFcfa: "0",
       });
+
+      await tx.insert(organizationBillingProfiles).values({
+        organizationId: organization.id,
+      });
     });
-  } catch (dbError) {
-    console.error("[auth/register] Erreur création profil DB:", dbError);
-    await serviceSupabase.auth.admin.deleteUser(data.user.id);
-    return {
-      error:
-        "Le compte n'a pas pu être initialisé. Réessayez dans quelques instants.",
-    };
+  } catch (error) {
+    console.error("[auth/register] Erreur création compte local:", error);
+    return { error: getRegistrationErrorMessage(error instanceof Error ? error.message : "") };
   }
 
-  const supabase = createSupabaseServerClient();
-  const { error: signInError } = await supabase.auth.signInWithPassword({
-    email: validated.data.email,
-    password: validated.data.password,
-  });
-
-  if (signInError) {
-    console.error("[auth/register] Connexion automatique impossible:", signInError);
-    return {
-      success: true,
-      message:
-        "Compte créé. Vous pouvez maintenant vous connecter avec votre email et mot de passe.",
-    };
-  }
-
+  await createAuthSession(userId);
   redirect("/dashboard");
 }
 
 export async function loginAction(formData: FormData) {
   const rawData = {
-    email: formData.get("email") as string,
-    password: formData.get("password") as string,
+    email: String(formData.get("email") ?? "").trim().toLowerCase(),
+    password: String(formData.get("password") ?? ""),
   };
 
   const validated = loginSchema.safeParse(rawData);
-  if (!validated.success) {
-    return { error: validated.error.errors[0].message };
-  }
+  if (!validated.success) return { error: validated.error.errors[0].message };
 
-  if (isDemoAuthMode()) {
-    redirect("/dashboard");
-  }
+  if (isDemoAuthMode()) redirect("/dashboard");
 
-  const supabase = createSupabaseServerClient();
-
-  const { error } = await supabase.auth.signInWithPassword({
-    email: validated.data.email,
-    password: validated.data.password,
+  const user = await db.query.users.findFirst({
+    where: eq(users.email, validated.data.email),
   });
 
-  if (error) {
-    return { error: "Email ou mot de passe incorrect." };
+  if (!user || !user.isActive) return { error: "Email ou mot de passe incorrect." };
+  if (!user.passwordHash || !user.passwordSalt) {
+    return {
+      error: "Ce compte doit définir un nouveau mot de passe avant la première connexion.",
+    };
   }
 
+  const valid = await verifyPassword(
+    validated.data.password,
+    user.passwordSalt,
+    user.passwordHash
+  );
+  if (!valid) return { error: "Email ou mot de passe incorrect." };
+
+  await createAuthSession(user.id);
   redirect("/dashboard");
 }
 
 export async function logoutAction() {
-  const supabase = createSupabaseServerClient();
-  await supabase.auth.signOut();
+  await destroyAuthSession();
   redirect("/login");
 }

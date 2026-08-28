@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { randomUUID } from "crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { organizations, users, wallets, transactions, leadDatabasePurchases, leadDatabases } from "@/lib/db/schema";
-import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import { hashPassword } from "@/lib/auth-crypto";
 import { generateSlug } from "@/lib/utils";
 import { isSuperAdmin, PLATFORM_ADMIN_PERMISSIONS, requirePlatformAdmin, SUPER_ADMIN_EMAIL } from "@/lib/admin";
 
@@ -38,22 +39,10 @@ async function ensureUserProfile({
   const existing = await db.query.users.findFirst({ where: eq(users.email, normalizedEmail) });
   if (existing) return existing;
 
-  const serviceSupabase = createSupabaseServiceClient();
-  const { data, error } = await serviceSupabase.auth.admin.createUser({
-    email: normalizedEmail,
-    password: password || crypto.randomUUID(),
-    email_confirm: true,
-    user_metadata: {
-      organization_name: organizationName || normalizedEmail.split("@")[0],
-    },
-  });
-
-  if (error || !data.user) {
-    throw new Error(error?.message || "Impossible de créer le compte Supabase.");
-  }
-
   const orgName = organizationName || `Compte ${normalizedEmail}`;
-  const slug = `${generateSlug(orgName)}-${data.user.id.slice(0, 8)}`;
+  const userId = randomUUID();
+  const passwordData = await hashPassword(password || randomUUID());
+  const slug = `${generateSlug(orgName)}-${userId.slice(0, 8)}`;
 
   try {
     const [createdUser] = await db.transaction(async (tx) => {
@@ -65,10 +54,13 @@ async function ensureUserProfile({
       const [profile] = await tx
         .insert(users)
         .values({
-          id: data.user!.id,
+          id: userId,
           organizationId: organization.id,
           email: normalizedEmail,
           role,
+          passwordHash: passwordData.hash,
+          passwordSalt: passwordData.salt,
+          passwordResetRequired: !password,
           subscriptionPlan: role === "super_admin" ? "enterprise" : "free",
           subscriptionExpiresAt: null,
           isActive: true,
@@ -81,7 +73,6 @@ async function ensureUserProfile({
     });
     return createdUser;
   } catch (error) {
-    await serviceSupabase.auth.admin.deleteUser(data.user.id);
     throw error;
   }
 }

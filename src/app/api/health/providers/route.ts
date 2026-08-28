@@ -86,11 +86,8 @@ async function checkVapi(): Promise<{
 
 export async function GET() {
   const vapi = await checkVapi();
-  const supabase = {
-    urlConfigured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
-    anonKeyConfigured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-    serviceRoleConfigured: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
-    databaseConfigured: Boolean(process.env.DATABASE_URL),
+  const database = {
+    configured: Boolean(process.env.DATABASE_URL),
   };
 
   const billing = {
@@ -102,14 +99,11 @@ export async function GET() {
     vapi.api.reachable === true &&
     vapi.phoneNumbers.reachable === true &&
     vapi.phoneNumbers.configuredPhoneNumberPresent === true &&
-    supabase.urlConfigured &&
-    supabase.anonKeyConfigured &&
-    supabase.serviceRoleConfigured &&
-    supabase.databaseConfigured;
+    database.configured;
 
   return NextResponse.json({
     status: ok ? "ok" : "degraded",
     timestamp: new Date().toISOString(),
-    providers: { vapi, supabase, billing },
+    providers: { vapi, database, billing },
   });
 }

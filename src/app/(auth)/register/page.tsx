@@ -27,8 +27,6 @@ export default function RegisterPage() {
       const result = await registerAction(formData);
       if (result?.error) {
         toast.error(result.error);
-      } else if (result?.message) {
-        toast.success(result.message);
       }
     });
   }

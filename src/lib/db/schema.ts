@@ -23,11 +23,14 @@ export const organizations = pgTable("organizations", {
 export const users = pgTable(
   "users",
   {
-    id: uuid("id").primaryKey(), // Lié à auth.users de Supabase
+    id: uuid("id").primaryKey(),
     organizationId: uuid("organization_id")
       .references(() => organizations.id, { onDelete: "cascade" })
       .notNull(),
     email: text("email").notNull().unique(),
+    passwordHash: text("password_hash"),
+    passwordSalt: text("password_salt"),
+    passwordResetRequired: boolean("password_reset_required").default(false).notNull(),
     role: text("role").default("member").notNull(), // 'super_admin', 'admin', 'owner', 'member'
     subscriptionPlan: text("subscription_plan").default("free").notNull(), // 'free', 'pro', 'enterprise'
     subscriptionExpiresAt: timestamp("subscription_expires_at"), // NULL = illimité/permanent pour un plan payant
@@ -37,6 +40,23 @@ export const users = pgTable(
   },
   (table) => ({
     orgIdx: index("users_org_idx").on(table.organizationId),
+  })
+);
+
+export const authSessions = pgTable(
+  "auth_sessions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    userIdx: index("auth_sessions_user_idx").on(table.userId),
+    expiryIdx: index("auth_sessions_expiry_idx").on(table.expiresAt),
   })
 );
 
